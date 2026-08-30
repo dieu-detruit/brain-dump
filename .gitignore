@@ -6,3 +6,6 @@ dist
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
+
+# Separate local repository containing personal DB history
+brain-dump-history/

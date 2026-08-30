@@ -68,3 +68,7 @@ curl -X POST "$SUPABASE_URL/rest/v1/rpc/add_thread" \
 - `threads`: タイトルと委譲先（`null | ai | colleague`）
 - `brain_state`: ユーザーにつき一行、`executing_thread_id`のみを保持
 - RLSにより、認証ユーザーは自分の行だけ読み書き可能
+
+## DBの変化をローカルGitで追う
+
+最新のmigrationを反映すると、変更履歴とThread別の実行時間がDBへ記録されます。ローカルへの書き出しとGit管理は、アプリとは独立した`../brain-dump-history`のPython（uv）プロジェクトで行います。
