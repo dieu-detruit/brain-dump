@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import pathlib
 
+from brain_dump_sdk import auth as sdk_auth
 from brain_dump_sdk import BrainDumpClient
 
 CONFIG_DIR = pathlib.Path.home() / ".config" / "brain-dump"
@@ -58,15 +59,15 @@ class BridgeConfig:
     def load(cls) -> "BridgeConfig":
         url = get("BRAIN_DUMP_URL")
         anon = get("BRAIN_DUMP_ANON_KEY")
-        refresh = get("BRAIN_DUMP_REFRESH_TOKEN")
         port = int(get("BRAIN_DUMP_BRIDGE_PORT", "8877"))
-        if refresh and get("BRAIN_DUMP_TOKEN_FILE"):
-            return cls(url=url, anon_key=anon, port=port,
-                       refresh_token=refresh, token_file=get("BRAIN_DUMP_TOKEN_FILE"))
-        if refresh:
-            return cls(url=url, anon_key=anon, port=port, refresh_token=refresh)
-        # fall back to the on-disk refresh token (auto-managed)
-        return cls(url=url, anon_key=anon, port=port)
+        explicit_file = get("BRAIN_DUMP_TOKEN_FILE")
+        token_file = explicit_file or str(token_path())
+        refresh = get("BRAIN_DUMP_REFRESH_TOKEN")
+        if not refresh:
+            # `auth-login` persisted it on disk; fall back to that.
+            refresh = sdk_auth.load_refresh_token(token_file) or ""
+        return cls(url=url, anon_key=anon, port=port,
+                   refresh_token=refresh, token_file=token_file)
 
     def new_client(self) -> BrainDumpClient:
         return BrainDumpClient(
