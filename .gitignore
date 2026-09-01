@@ -7,5 +7,11 @@ dist
 vite.config.js
 vite.config.d.ts
 
+# Python tooling (brain-dump-sdk, brain-dump-bridge)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
 # Separate local repository containing personal DB history
 brain-dump-history/

@@ -67,3 +67,46 @@ def test_add_thread_rejects_invalid_title(title: str) -> None:
     )
     with pytest.raises(ValueError):
         client.add_thread(title)
+
+
+def test_add_thread_401_refreshes_token_and_retries(tmp_path) -> None:
+    seen: list[str] = []
+    token_file = tmp_path / "refresh_token"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        if request.url.path == "/auth/v1/token":
+            assert json.loads(request.read()) == {"refresh_token": "rt"}
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "fresh-token",
+                    "refresh_token": "rotated-token",
+                    "expires_in": 3600,
+                    "token_type": "bearer",
+                    "user": {"id": "u1"},
+                },
+            )
+        # add_thread: first call 401, the retry succeeds with the fresh token
+        if seen.count("/rest/v1/rpc/add_thread") == 1:
+            return httpx.Response(401, json={"message": "JWT expired"})
+        assert request.headers["authorization"] == "Bearer fresh-token"
+        return httpx.Response(200, json=response_payload())
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    client = BrainDumpClient(
+        url="https://example.supabase.co",
+        anon_key="anon",
+        access_token="expired",
+        refresh_token="rt",
+        token_file=token_file,
+        http_client=http,
+    )
+    thread = client.add_thread("A thread")
+    assert thread.title == "Write the release notes"
+    assert seen == [
+        "/rest/v1/rpc/add_thread",
+        "/auth/v1/token",
+        "/rest/v1/rpc/add_thread",
+    ]
+    assert token_file.read_text().strip() == "rotated-token"

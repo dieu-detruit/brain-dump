@@ -1,0 +1,15 @@
+[Unit]
+Description=brain-dump bridge: turn generic pushes into Threads
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+WorkingDirectory=%h/my-oss/brain-dump/packages/brain-dump-bridge
+EnvironmentFile=%h/.config/brain-dump/env
+ExecStart=%h/.local/bin/uv run brain-dump-bridge serve
+
+[Install]
+WantedBy=default.target

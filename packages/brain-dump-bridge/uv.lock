@@ -16,16 +16,30 @@ wheels = [
 ]
 
 [[package]]
-name = "brain-dump-sdk"
+name = "brain-dump-bridge"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "httpx" },
+    { name = "brain-dump-sdk" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "brain-dump-sdk", directory = "../brain-dump-sdk" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest" }]
+
+[[package]]
+name = "brain-dump-sdk"
+version = "0.1.0"
+source = { directory = "../brain-dump-sdk" }
+dependencies = [
+    { name = "httpx" },
 ]
 
 [package.metadata]
