@@ -19,7 +19,7 @@ pnpm install
 pnpm dev
 ```
 
-環境変数を設定しない場合、認証なしのデモモードで起動し、データはそのブラウザだけに保存されます。
+`pnpm dev`では認証なしのデモモードで起動し、データはそのブラウザだけに保存されます。Supabase認証をローカルで確認するときは`VITE_DEMO_MODE=false pnpm dev`で起動してください。
 
 ## Supabaseのセットアップ
 

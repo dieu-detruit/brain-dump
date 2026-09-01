@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Bot, CircleUserRound, LogOut, Moon, Plus, Trash2, UserRound, X } from 'lucide-react'
+import { Bot, CircleUserRound, LogOut, Moon, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { loadLocal, saveLocal } from './lib/localStore'
@@ -98,9 +98,23 @@ export default function App() {
     }
   }
 
+  async function updateThread(thread: Thread, nextTitle: string, nextDelegation: Delegation) {
+    const trimmed = nextTitle.trim()
+    if (!trimmed || (trimmed === thread.title && nextDelegation === thread.delegation)) return
+    const updatedAt = new Date().toISOString()
+    setState(previous => ({
+      ...previous,
+      threads: previous.threads.map(item => item.id === thread.id ? { ...item, title: trimmed, delegation: nextDelegation, updated_at: updatedAt } : item),
+    }))
+    if (supabase && userId) {
+      const { error: updateError } = await supabase.from("threads").update({ title: trimmed, delegation: nextDelegation }).eq("id", thread.id)
+      if (updateError) { setError(updateError.message); void fetchState() }
+    }
+  }
+
   async function signIn() {
     if (!supabase) return
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: new URL('/', window.location.origin).toString() } })
   }
 
   if (!authReady) return <main className="center"><div className="pulse">●</div></main>
@@ -117,12 +131,14 @@ export default function App() {
   return (
     <main className="app-shell">
       <header>
-        <div><p className="eyebrow">BRAIN DUMP</p><h1>いま、何を持つ？</h1></div>
+        <div><p className="eyebrow">BRAIN DUMP</p></div>
         <div className="header-actions">
           {!isSupabaseConfigured && <span className="demo-badge">この端末に保存</span>}
           {session && <button className="icon-button" aria-label="ログアウト" onClick={() => supabase?.auth.signOut()}><LogOut size={19} /></button>}
         </div>
       </header>
+
+      <p className="execution-principle">THINK WIDE. <strong>EXECUTE ONE THREAD.</strong></p>
 
       {error && <div className="error-banner">{error}<button onClick={() => setError(null)}><X size={16} /></button></div>}
 
@@ -135,6 +151,16 @@ export default function App() {
       {adding && (
         <form className="composer" onSubmit={addThread}>
           <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="何を頭から出しますか？" aria-label="スレッド名" />
+          <aside className="new-thread-checklist" aria-labelledby="new-thread-checklist-title">
+            <p id="new-thread-checklist-title">IS THIS A NEW THREAD?</p>
+            <ul>
+              <li>既存のThreadとは異なる成果を目指している？</li>
+              <li>ほかのThreadと独立して進められる？</li>
+              <li>比較するだけの分岐ではなく、進むと決めた方向？</li>
+              <li>今進められる実行者に任せている？</li>
+            </ul>
+          </aside>
+          <div className="composer-footer">
           <div className="delegation-picker">
             {([null, 'ai', 'colleague'] as Delegation[]).map(value => (
               <button type="button" key={value ?? 'sleep'} className={delegation === value ? 'selected' : ''} onClick={() => setDelegation(value)} aria-label={delegationLabel(value)} title={delegationLabel(value)}>
@@ -143,13 +169,14 @@ export default function App() {
             ))}
           </div>
           <div className="composer-actions"><button type="button" className="text-button" onClick={() => setAdding(false)}>キャンセル</button><button className="save-button">追加する</button></div>
+          </div>
         </form>
       )}
 
       {loading ? <div className="loading">読み込んでいます…</div> : (
         <div className="thread-groups">
-          <ThreadGroup title="待機中" caption="まだ誰にも渡していない" threads={sleeping} activeId={state.executingThreadId} onExecute={execute} onRemove={remove} />
-          <ThreadGroup title="進行中" caption="AI・他の人に任せている" threads={delegated} activeId={state.executingThreadId} onExecute={execute} onRemove={remove} />
+          <ThreadGroup title="待機中" caption="まだ誰にも渡していない" threads={sleeping} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} />
+          <ThreadGroup title="進行中" caption="AI・他の人に任せている" threads={delegated} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} />
           {!state.threads.length && <div className="empty-list"><Moon size={32} /><p>頭の中は空っぽです。</p><span>新しいスレッドを置いてみましょう。</span></div>}
         </div>
       )}
@@ -157,17 +184,45 @@ export default function App() {
   )
 }
 
-function ThreadGroup({ title, caption, threads, activeId, onExecute, onRemove }: { title: string; caption: string; threads: Thread[]; activeId: string | null; onExecute: (id: string) => void; onRemove: (thread: Thread) => void }) {
+function ThreadGroup({ title, caption, threads, activeId, onExecute, onUpdate, onRemove }: { title: string; caption: string; threads: Thread[]; activeId: string | null; onExecute: (id: string) => void; onUpdate: (thread: Thread, title: string, delegation: Delegation) => void; onRemove: (thread: Thread) => void }) {
+  const [editingThread, setEditingThread] = useState<Thread | null>(null)
   if (!threads.length) return null
   return <section className="thread-group">
     <div className="group-title"><h2>{title}</h2><span>{caption}</span></div>
     <div className="thread-list">{threads.map(thread => (
-      <article className={`thread-card ${activeId === thread.id ? 'active' : ''}`} key={thread.id}>
+      <article className={`thread-card ${activeId === thread.id ? "active" : ""}`} key={thread.id}>
         <button className="magnet" onClick={() => onExecute(thread.id)} aria-label={`${thread.title}を自分が実行する`}><span /></button>
-        <div className="thread-info"><h3>{thread.title}</h3></div>
-        <div className={`delegation ${thread.delegation ?? 'sleep'}`} role="img" aria-label={delegationLabel(thread.delegation)} title={delegationLabel(thread.delegation)}><DelegationIcon value={thread.delegation} size={23} /></div>
+        <button className="thread-info title-button" onClick={() => setEditingThread(thread)} aria-label={`${thread.title}を編集`}>
+          <h3>{thread.title}</h3><Pencil className="edit-icon" size={15} aria-hidden="true" />
+        </button>
+        <div className={`delegation ${thread.delegation ?? "sleep"}`} role="img" aria-label={delegationLabel(thread.delegation)} title={delegationLabel(thread.delegation)}><DelegationIcon value={thread.delegation} size={23} /></div>
         <button className="delete-button" onClick={() => onRemove(thread)} aria-label={`${thread.title}を削除`}><Trash2 size={17} /></button>
       </article>
     ))}</div>
+    {editingThread && <EditThreadDialog key={editingThread.id} thread={editingThread} onClose={() => setEditingThread(null)} onSave={(nextTitle, nextDelegation) => { void onUpdate(editingThread, nextTitle, nextDelegation); setEditingThread(null) }} />}
   </section>
+}
+
+function EditThreadDialog({ thread, onClose, onSave }: { thread: Thread; onClose: () => void; onSave: (title: string, delegation: Delegation) => void }) {
+  const [value, setValue] = useState(thread.title)
+  const [nextDelegation, setNextDelegation] = useState<Delegation>(thread.delegation)
+
+  return (
+    <div className="dialog-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+      <form className="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-dialog-title" onSubmit={event => { event.preventDefault(); if (value.trim()) onSave(value.trim(), nextDelegation) }} onKeyDown={event => { if (event.key === "Escape") onClose() }}>
+        <div className="dialog-heading"><h2 id="edit-dialog-title">スレッドを編集</h2><button type="button" className="icon-button" onClick={onClose} aria-label="閉じる"><X size={19} /></button></div>
+        <label className="field-label" htmlFor="edit-title">タイトル</label>
+        <input id="edit-title" className="dialog-title-input" autoFocus value={value} maxLength={500} onChange={event => setValue(event.target.value)} />
+        <span className="field-label">任せ先</span>
+        <div className="dialog-delegation-picker">
+          {([null, "ai", "colleague"] as Delegation[]).map(option => (
+            <button type="button" key={option ?? "sleep"} className={nextDelegation === option ? "selected" : ""} onClick={() => setNextDelegation(option)} aria-label={delegationLabel(option)} title={delegationLabel(option)}>
+              <DelegationIcon value={option} size={27} />
+            </button>
+          ))}
+        </div>
+        <div className="dialog-actions"><button type="button" className="text-button" onClick={onClose}>キャンセル</button><button className="save-button" disabled={!value.trim()}>保存する</button></div>
+      </form>
+    </div>
+  )
 }
