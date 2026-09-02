@@ -141,9 +141,14 @@ def login(
     *,
     redirect_port: int = 8881,
     open_browser: bool = True,
+    manual_code: bool = False,
 ) -> str:
-    """Interactive one-time Google login. Returns the refresh token — the caller
-    persists it (see save_refresh_token) and everything after this is headless."""
+    """Interactive one-time Google login.
+
+    With ``manual_code=True``, use the ``code`` query parameter from a callback
+    URL manually. This supports a browser that is not on the same localhost as
+    the process running this function.
+    """
     verifier = _new_code_verifier()
     challenge = _code_challenge(verifier)
     redirect_to = f"http://127.0.0.1:{redirect_port}/callback"
@@ -182,6 +187,12 @@ def login(
 
         webbrowser.open(authorize_url)
 
+    if manual_code:
+        code = input("Paste the code query parameter from the callback URL: ").strip()
+        if not code:
+            raise BrainDumpAPIError("login received no authorization code")
+        return _finish_login(url, anon_key, code, verifier)
+
     with ReusableTCPServer(("127.0.0.1", redirect_port), Callback) as httpd:
         httpd.timeout = 0.2
         for _ in range(300):  # up to ~60s
@@ -196,10 +207,14 @@ def login(
             status_code=None,
         )
 
+    return _finish_login(url, anon_key, caught["code"], verifier)
+
+
+def _finish_login(url: str, anon_key: str, code: str, verifier: str) -> str:
     session = _parse_session(
         _gotrue_call(
             url, anon_key, "/auth/v1/token?grant_type=pkce",
-            {"auth_code": caught["code"], "code_verifier": verifier},
+            {"auth_code": code, "code_verifier": verifier},
         )
     )
     if not session.refresh_token:

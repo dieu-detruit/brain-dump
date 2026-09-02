@@ -1,0 +1,15 @@
+[Unit]
+Description=Brain Dump history subscriber
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/brain-dump/env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/.local/bin/uv run --project %h/my-oss/brain-dump/packages/brain-dump-history brain-dump-history watch --repository %h/my-oss/brain-dump-history --token-file %h/.config/brain-dump/history_refresh_token
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
