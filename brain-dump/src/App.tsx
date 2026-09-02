@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { BarChart3, Bot, CircleUserRound, LogOut, Moon, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { BarChart3, Bot, CircleUserRound, GripVertical, LogOut, Moon, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { loadLocal, saveLocal } from './lib/localStore'
-import type { BrainState, Delegation, ExecutionSession, Thread } from './types'
+import type { BrainState, ChangeLog, Delegation, ExecutionSession, Thread } from './types'
 
 const emptyState: BrainState = { threads: [], executingThreadId: null }
 
@@ -28,6 +28,7 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [sessions, setSessions] = useState<ExecutionSession[]>([])
+  const [changes, setChanges] = useState<ChangeLog[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const userId = session?.user.id
@@ -35,7 +36,7 @@ export default function App() {
   const fetchState = useCallback(async () => {
     if (!supabase || !userId) return
     const [{ data: threads, error: threadError }, { data: appState, error: stateError }] = await Promise.all([
-      supabase.from('threads').select('id,title,delegation,created_at,updated_at').order('created_at'),
+      supabase.from('threads').select('id,title,delegation,priority,created_at,updated_at').order('priority').order('created_at'),
       supabase.from('brain_state').select('executing_thread_id').maybeSingle(),
     ])
     if (threadError || stateError) setError(threadError?.message ?? stateError?.message ?? '読み込めませんでした')
@@ -46,12 +47,15 @@ export default function App() {
   const fetchHistory = useCallback(async () => {
     if (!supabase || !userId) return
     setHistoryLoading(true)
-    const { data, error: historyError } = await supabase
-      .from('execution_sessions')
-      .select('id,thread_id,thread_title,started_at,ended_at')
-      .order('started_at', { ascending: false })
-    if (historyError) setError(historyError.message)
-    else setSessions((data ?? []) as ExecutionSession[])
+    const [{ data: sessionData, error: sessionError }, { data: changeData, error: changeError }] = await Promise.all([
+      supabase.from('execution_sessions').select('id,thread_id,thread_title,started_at,ended_at').order('started_at', { ascending: false }),
+      supabase.from('change_log').select('id,entity_type,entity_id,operation,changed_at,before_data,after_data').order('changed_at', { ascending: false }).limit(100),
+    ])
+    if (sessionError || changeError) setError(sessionError?.message ?? changeError?.message ?? '履歴を読み込めませんでした')
+    else {
+      setSessions((sessionData ?? []) as ExecutionSession[])
+      setChanges((changeData ?? []) as ChangeLog[])
+    }
     setHistoryLoading(false)
   }, [userId])
 
@@ -82,6 +86,7 @@ export default function App() {
     void fetchHistory()
     const channel = supabase.channel(`brain-dump-history-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'execution_sessions', filter: `user_id=eq.${userId}` }, fetchHistory)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'change_log', filter: `user_id=eq.${userId}` }, fetchHistory)
       .subscribe()
     return () => { void supabase?.removeChannel(channel) }
   }, [fetchHistory, userId])
@@ -95,11 +100,12 @@ export default function App() {
     if (!trimmed) return
     setError(null)
     if (supabase && userId) {
-      const { error: insertError } = await supabase.from('threads').insert({ title: trimmed, delegation, user_id: userId })
+      const priority = Math.max(0, ...state.threads.map(thread => thread.priority)) + 1024
+      const { error: insertError } = await supabase.from('threads').insert({ title: trimmed, delegation, priority, user_id: userId })
       if (insertError) { setError(insertError.message); return }
     } else {
       const now = new Date().toISOString()
-      setState(previous => ({ ...previous, threads: [...previous.threads, { id: crypto.randomUUID(), title: trimmed, delegation, created_at: now, updated_at: now }] }))
+      setState(previous => ({ ...previous, threads: [...previous.threads, { id: crypto.randomUUID(), title: trimmed, delegation, priority: Math.max(0, ...previous.threads.map(thread => thread.priority)) + 1024, created_at: now, updated_at: now }] }))
     }
     setTitle('')
     setAdding(false)
@@ -136,6 +142,27 @@ export default function App() {
     }
   }
 
+  async function reorderThreads(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return
+    const ordered = [...state.threads].sort((a, b) => a.priority - b.priority)
+    const sourceIndex = ordered.findIndex(thread => thread.id === sourceId)
+    const targetIndex = ordered.findIndex(thread => thread.id === targetId)
+    if (sourceIndex < 0 || targetIndex < 0) return
+    const [moved] = ordered.splice(sourceIndex, 1)
+    const nextIndex = ordered.findIndex(thread => thread.id === targetId)
+    ordered.splice(nextIndex, 0, moved)
+    const index = ordered.findIndex(thread => thread.id === sourceId)
+    const before = ordered[index - 1]?.priority
+    const after = ordered[index + 1]?.priority
+    const priority = before === undefined ? (after ?? 1024) - 1024 : after === undefined ? before + 1024 : (before + after) / 2
+    const updatedAt = new Date().toISOString()
+    setState(previous => ({ ...previous, threads: previous.threads.map(thread => thread.id === sourceId ? { ...thread, priority, updated_at: updatedAt } : thread) }))
+    if (supabase && userId) {
+      const { error: updateError } = await supabase.from('threads').update({ priority }).eq('id', sourceId)
+      if (updateError) { setError(updateError.message); void fetchState() }
+    }
+  }
+
   async function signIn() {
     if (!supabase) return
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: new URL('/', window.location.origin).toString() } })
@@ -167,7 +194,7 @@ export default function App() {
 
       {error && <div className="error-banner">{error}<button onClick={() => setError(null)}><X size={16} /></button></div>}
 
-      {historyOpen ? <HistoryView sessions={sessions} loading={historyLoading} /> : <>
+      {historyOpen ? <HistoryView sessions={sessions} changes={changes} loading={historyLoading} /> : <>
       <div className="toolbar">
         <div><span className="count">{state.threads.length}</span><span className="muted"> threads</span></div>
         <button className="add-button" onClick={() => setAdding(true)}><Plus size={20} /> スレッドを置く</button>
@@ -200,8 +227,8 @@ export default function App() {
 
       {loading ? <div className="loading">読み込んでいます…</div> : (
         <div className="thread-groups">
-          <ThreadGroup title="待機中" caption="まだ誰にも渡していない" threads={sleeping} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} />
-          <ThreadGroup title="進行中" caption="AI・他の人に任せている" threads={delegated} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} />
+          <ThreadGroup title="待機中" caption="まだ誰にも渡していない · 上ほど優先" threads={sleeping} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} onReorder={reorderThreads} />
+          <ThreadGroup title="進行中" caption="AI・他の人に任せている · 上ほど優先" threads={delegated} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} onReorder={reorderThreads} />
           {!state.threads.length && <div className="empty-list"><Moon size={32} /><p>頭の中は空っぽです。</p><span>新しいスレッドを置いてみましょう。</span></div>}
         </div>
       )}</>}
@@ -227,7 +254,7 @@ function dayKey(value: string) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-function HistoryView({ sessions, loading }: { sessions: ExecutionSession[]; loading: boolean }) {
+function HistoryView({ sessions, changes, loading }: { sessions: ExecutionSession[]; changes: ChangeLog[]; loading: boolean }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 60_000)
@@ -258,9 +285,10 @@ function HistoryView({ sessions, loading }: { sessions: ExecutionSession[]; load
     return { key, label: `${date.getMonth() + 1}/${date.getDate()}`, seconds: byDay.get(key) ?? 0 }
   })
   const dayMaximum = Math.max(...days.map(day => day.seconds), 1)
+  const priorityChanges = changes.filter(change => change.entity_type === 'thread' && change.operation === 'update' && change.before_data?.priority !== change.after_data?.priority)
 
   if (loading) return <div className="loading">記録を読み込んでいます…</div>
-  if (!sessions.length) return <div className="history-empty"><BarChart3 size={32} /><p>まだ実行の記録はありません。</p><span>スレッドを「自分が実行する」にすると、ここに時間が積み上がります。</span></div>
+  if (!sessions.length && !priorityChanges.length) return <div className="history-empty"><BarChart3 size={32} /><p>まだ記録はありません。</p><span>スレッドを実行したり、優先順位を並べ替えたりすると、ここに記録されます。</span></div>
 
   return <section className="history-view" aria-label="実行記録">
     <div className="history-summary">
@@ -268,22 +296,36 @@ function HistoryView({ sessions, loading }: { sessions: ExecutionSession[]; load
       <div><span>これまでの合計</span><strong>{formatDuration(total)}</strong></div>
       <div><span>扱ったスレッド</span><strong>{threads.length}件</strong></div>
     </div>
-    <section className="history-section"><div className="history-heading"><h2>直近7日</h2><span>開始日ごとの実行時間</span></div>
+    {sessions.length > 0 && <><section className="history-section"><div className="history-heading"><h2>直近7日</h2><span>開始日ごとの実行時間</span></div>
       <div className="day-chart">{days.map(day => <div className="day-column" key={day.key}><div className="day-track"><div className="day-fill" style={{ height: `${(day.seconds / dayMaximum) * 100}%` }} title={formatDuration(day.seconds)} /></div><span>{day.label}</span></div>)}</div>
-    </section>
-    <section className="history-section"><div className="history-heading"><h2>スレッド別</h2><span>実行時間が長い順</span></div>
+    </section></>}
+    {sessions.length > 0 && <section className="history-section"><div className="history-heading"><h2>スレッド別</h2><span>実行時間が長い順</span></div>
       <div className="thread-metrics">{threads.map(thread => <article key={thread.id} className="thread-metric"><div className="metric-title"><div><h3>{thread.title}</h3><span>{thread.count} 回の実行{thread.active && ' · 実行中'}</span></div><strong>{formatDuration(thread.seconds)}</strong></div><div className="metric-track"><div style={{ width: `${(thread.seconds / maximum) * 100}%` }} /></div></article>)}</div>
-    </section>
+    </section>}
+    {priorityChanges.length > 0 && <section className="history-section"><div className="history-heading"><h2>優先順位の変更</h2><span>新しい順</span></div>
+      <div className="priority-history">{priorityChanges.map(change => <article className="priority-change" key={change.id}><strong>{String(change.after_data?.title ?? change.before_data?.title ?? 'スレッド')}</strong><span>{new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(change.changed_at))} に並べ替え</span></article>)}</div>
+    </section>}
   </section>
 }
 
-function ThreadGroup({ title, caption, threads, activeId, onExecute, onUpdate, onRemove }: { title: string; caption: string; threads: Thread[]; activeId: string | null; onExecute: (id: string) => void; onUpdate: (thread: Thread, title: string, delegation: Delegation) => void; onRemove: (thread: Thread) => void }) {
+function ThreadGroup({ title, caption, threads, activeId, onExecute, onUpdate, onRemove, onReorder }: { title: string; caption: string; threads: Thread[]; activeId: string | null; onExecute: (id: string) => void; onUpdate: (thread: Thread, title: string, delegation: Delegation) => void; onRemove: (thread: Thread) => void; onReorder: (sourceId: string, targetId: string) => void }) {
   const [editingThread, setEditingThread] = useState<Thread | null>(null)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
+  const touchTargetId = useRef<string | null>(null)
+  const sortedThreads = [...threads].sort((a, b) => a.priority - b.priority)
+  function finishDrag(sourceId: string, targetId: string | null) {
+    setDraggedId(null)
+    setDropTargetId(null)
+    touchTargetId.current = null
+    if (targetId && sourceId !== targetId) void onReorder(sourceId, targetId)
+  }
   if (!threads.length) return null
   return <section className="thread-group">
     <div className="group-title"><h2>{title}</h2><span>{caption}</span></div>
-    <div className="thread-list">{threads.map(thread => (
-      <article className={`thread-card ${activeId === thread.id ? "active" : ""}`} key={thread.id}>
+    <div className="thread-list">{sortedThreads.map(thread => (
+      <article data-thread-id={thread.id} className={`thread-card ${activeId === thread.id ? "active" : ""} ${draggedId === thread.id ? 'dragging' : ''} ${draggedId && draggedId !== thread.id && dropTargetId === thread.id ? 'drag-target' : ''}`} key={thread.id} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropTargetId(thread.id) }} onDrop={event => { event.preventDefault(); finishDrag(event.dataTransfer.getData('text/plain'), thread.id) }}>
+        <button className="drag-handle" type="button" draggable onDragStart={event => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', thread.id); setDraggedId(thread.id) }} onDragEnd={() => { setDraggedId(null); setDropTargetId(null) }} onPointerDown={event => { if (event.pointerType === 'touch') { touchTargetId.current = thread.id; setDropTargetId(thread.id); setDraggedId(thread.id); event.currentTarget.setPointerCapture(event.pointerId) } }} onPointerMove={event => { if (event.pointerType !== 'touch' || !draggedId) return; const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-thread-id]')?.dataset.threadId; if (target && sortedThreads.some(item => item.id === target)) { touchTargetId.current = target; setDropTargetId(target) } }} onPointerUp={event => { if (event.pointerType === 'touch') finishDrag(thread.id, touchTargetId.current) }} aria-label={`${thread.title}の優先順位を並べ替える`} title="ドラッグして並べ替え"><GripVertical size={20} /></button>
         <button className="magnet" onClick={() => onExecute(thread.id)} aria-label={`${thread.title}を自分が実行する`}><span /></button>
         <button className="thread-info title-button" onClick={() => setEditingThread(thread)} aria-label={`${thread.title}を編集`}>
           <h3>{thread.title}</h3><Pencil className="edit-icon" size={15} aria-hidden="true" />

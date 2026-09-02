@@ -65,7 +65,7 @@ curl -X POST "$SUPABASE_URL/rest/v1/rpc/add_thread" \
 
 ## データモデル
 
-- `threads`: タイトルと委譲先（`null | ai | colleague`）
+- `threads`: タイトル、委譲先（`null | ai | colleague`）、優先順位（小さい値ほど上位）
 - `brain_state`: ユーザーにつき一行、`executing_thread_id`のみを保持
 - RLSにより、認証ユーザーは自分の行だけ読み書き可能
 
