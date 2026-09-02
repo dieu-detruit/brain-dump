@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Bot, CircleUserRound, LogOut, Moon, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
+import { BarChart3, Bot, CircleUserRound, LogOut, Moon, Pencil, Plus, Trash2, UserRound, X } from 'lucide-react'
 import type { Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { loadLocal, saveLocal } from './lib/localStore'
-import type { BrainState, Delegation, Thread } from './types'
+import type { BrainState, Delegation, ExecutionSession, Thread } from './types'
 
 const emptyState: BrainState = { threads: [], executingThreadId: null }
 
@@ -25,6 +25,9 @@ export default function App() {
   const [delegation, setDelegation] = useState<Delegation>(null)
   const [adding, setAdding] = useState(false)
   const [loading, setLoading] = useState(isSupabaseConfigured)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [sessions, setSessions] = useState<ExecutionSession[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const userId = session?.user.id
@@ -38,6 +41,18 @@ export default function App() {
     if (threadError || stateError) setError(threadError?.message ?? stateError?.message ?? '読み込めませんでした')
     else setState({ threads: (threads ?? []) as Thread[], executingThreadId: appState?.executing_thread_id ?? null })
     setLoading(false)
+  }, [userId])
+
+  const fetchHistory = useCallback(async () => {
+    if (!supabase || !userId) return
+    setHistoryLoading(true)
+    const { data, error: historyError } = await supabase
+      .from('execution_sessions')
+      .select('id,thread_id,thread_title,started_at,ended_at')
+      .order('started_at', { ascending: false })
+    if (historyError) setError(historyError.message)
+    else setSessions((data ?? []) as ExecutionSession[])
+    setHistoryLoading(false)
   }, [userId])
 
   useEffect(() => {
@@ -61,6 +76,15 @@ export default function App() {
       .subscribe()
     return () => { void supabase?.removeChannel(channel) }
   }, [fetchState, userId])
+
+  useEffect(() => {
+    if (!supabase || !userId) return
+    void fetchHistory()
+    const channel = supabase.channel(`brain-dump-history-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'execution_sessions', filter: `user_id=eq.${userId}` }, fetchHistory)
+      .subscribe()
+    return () => { void supabase?.removeChannel(channel) }
+  }, [fetchHistory, userId])
 
   const sleeping = state.threads.filter(t => t.delegation === null)
   const delegated = state.threads.filter(t => t.delegation !== null)
@@ -134,15 +158,16 @@ export default function App() {
         <div><p className="eyebrow">BRAIN DUMP</p></div>
         <div className="header-actions">
           {!isSupabaseConfigured && <span className="demo-badge">この端末に保存</span>}
+          {isSupabaseConfigured && <button className={`history-button ${historyOpen ? 'selected' : ''}`} onClick={() => setHistoryOpen(open => !open)}><BarChart3 size={18} /> 記録</button>}
           {session && <button className="icon-button" aria-label="ログアウト" onClick={() => supabase?.auth.signOut()}><LogOut size={19} /></button>}
         </div>
       </header>
 
-      <p className="execution-principle">THINK WIDE. <strong>EXECUTE ONE THREAD.</strong></p>
+      <p className="execution-principle">{historyOpen ? <>LOOK BACK. <strong>MAKE ROOM FOR WHAT MATTERS.</strong></> : <>THINK WIDE. <strong>EXECUTE ONE THREAD.</strong></>}</p>
 
       {error && <div className="error-banner">{error}<button onClick={() => setError(null)}><X size={16} /></button></div>}
 
-
+      {historyOpen ? <HistoryView sessions={sessions} loading={historyLoading} /> : <>
       <div className="toolbar">
         <div><span className="count">{state.threads.length}</span><span className="muted"> threads</span></div>
         <button className="add-button" onClick={() => setAdding(true)}><Plus size={20} /> スレッドを置く</button>
@@ -179,9 +204,77 @@ export default function App() {
           <ThreadGroup title="進行中" caption="AI・他の人に任せている" threads={delegated} activeId={state.executingThreadId} onExecute={execute} onUpdate={updateThread} onRemove={remove} />
           {!state.threads.length && <div className="empty-list"><Moon size={32} /><p>頭の中は空っぽです。</p><span>新しいスレッドを置いてみましょう。</span></div>}
         </div>
-      )}
+      )}</>}
     </main>
   )
+}
+
+function durationSeconds(session: ExecutionSession, now: number) {
+  const started = new Date(session.started_at).getTime()
+  const ended = session.ended_at ? new Date(session.ended_at).getTime() : now
+  return Math.max(0, Math.round((ended - started) / 1000))
+}
+
+function formatDuration(seconds: number) {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours) return `${hours}時間${minutes ? `${minutes}分` : ''}`
+  return `${minutes}分`
+}
+
+function dayKey(value: string) {
+  const date = new Date(value)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function HistoryView({ sessions, loading }: { sessions: ExecutionSession[]; loading: boolean }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
+  const today = dayKey(new Date().toISOString())
+  const byThread = new Map<string, { title: string; seconds: number; count: number; active: boolean }>()
+  const byDay = new Map<string, number>()
+  for (const session of sessions) {
+    const seconds = durationSeconds(session, now)
+    const current = byThread.get(session.thread_id) ?? { title: session.thread_title, seconds: 0, count: 0, active: false }
+    current.title = session.thread_title
+    current.seconds += seconds
+    current.count += 1
+    current.active ||= !session.ended_at
+    byThread.set(session.thread_id, current)
+    const key = dayKey(session.started_at)
+    byDay.set(key, (byDay.get(key) ?? 0) + seconds)
+  }
+  const threads = [...byThread.entries()].map(([id, value]) => ({ id, ...value })).sort((a, b) => b.seconds - a.seconds)
+  const total = threads.reduce((sum, thread) => sum + thread.seconds, 0)
+  const todayTotal = byDay.get(today) ?? 0
+  const maximum = threads[0]?.seconds ?? 1
+  const days = Array.from({ length: 7 }, (_, offset) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - offset))
+    const key = dayKey(date.toISOString())
+    return { key, label: `${date.getMonth() + 1}/${date.getDate()}`, seconds: byDay.get(key) ?? 0 }
+  })
+  const dayMaximum = Math.max(...days.map(day => day.seconds), 1)
+
+  if (loading) return <div className="loading">記録を読み込んでいます…</div>
+  if (!sessions.length) return <div className="history-empty"><BarChart3 size={32} /><p>まだ実行の記録はありません。</p><span>スレッドを「自分が実行する」にすると、ここに時間が積み上がります。</span></div>
+
+  return <section className="history-view" aria-label="実行記録">
+    <div className="history-summary">
+      <div><span>今日の実行</span><strong>{formatDuration(todayTotal)}</strong></div>
+      <div><span>これまでの合計</span><strong>{formatDuration(total)}</strong></div>
+      <div><span>扱ったスレッド</span><strong>{threads.length}件</strong></div>
+    </div>
+    <section className="history-section"><div className="history-heading"><h2>直近7日</h2><span>開始日ごとの実行時間</span></div>
+      <div className="day-chart">{days.map(day => <div className="day-column" key={day.key}><div className="day-track"><div className="day-fill" style={{ height: `${(day.seconds / dayMaximum) * 100}%` }} title={formatDuration(day.seconds)} /></div><span>{day.label}</span></div>)}</div>
+    </section>
+    <section className="history-section"><div className="history-heading"><h2>スレッド別</h2><span>実行時間が長い順</span></div>
+      <div className="thread-metrics">{threads.map(thread => <article key={thread.id} className="thread-metric"><div className="metric-title"><div><h3>{thread.title}</h3><span>{thread.count} 回の実行{thread.active && ' · 実行中'}</span></div><strong>{formatDuration(thread.seconds)}</strong></div><div className="metric-track"><div style={{ width: `${(thread.seconds / maximum) * 100}%` }} /></div></article>)}</div>
+    </section>
+  </section>
 }
 
 function ThreadGroup({ title, caption, threads, activeId, onExecute, onUpdate, onRemove }: { title: string; caption: string; threads: Thread[]; activeId: string | null; onExecute: (id: string) => void; onUpdate: (thread: Thread, title: string, delegation: Delegation) => void; onRemove: (thread: Thread) => void }) {
