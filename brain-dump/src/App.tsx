@@ -24,12 +24,14 @@ export default function App() {
   const [title, setTitle] = useState('')
   const [delegation, setDelegation] = useState<Delegation>(null)
   const [adding, setAdding] = useState(false)
+  const [addingThread, setAddingThread] = useState(false)
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [sessions, setSessions] = useState<ExecutionSession[]>([])
   const [changes, setChanges] = useState<ChangeLog[]>([])
   const [error, setError] = useState<string | null>(null)
+  const addingThreadRef = useRef(false)
 
   const userId = session?.user.id
 
@@ -96,19 +98,27 @@ export default function App() {
 
   async function addThread(event: FormEvent) {
     event.preventDefault()
+    if (addingThreadRef.current) return
     const trimmed = title.trim()
     if (!trimmed) return
+    addingThreadRef.current = true
+    setAddingThread(true)
     setError(null)
-    if (supabase && userId) {
-      const priority = Math.max(0, ...state.threads.map(thread => thread.priority)) + 1024
-      const { error: insertError } = await supabase.from('threads').insert({ title: trimmed, delegation, priority, user_id: userId })
-      if (insertError) { setError(insertError.message); return }
-    } else {
-      const now = new Date().toISOString()
-      setState(previous => ({ ...previous, threads: [...previous.threads, { id: crypto.randomUUID(), title: trimmed, delegation, priority: Math.max(0, ...previous.threads.map(thread => thread.priority)) + 1024, created_at: now, updated_at: now }] }))
+    try {
+      if (supabase && userId) {
+        const priority = Math.max(0, ...state.threads.map(thread => thread.priority)) + 1024
+        const { error: insertError } = await supabase.from('threads').insert({ title: trimmed, delegation, priority, user_id: userId })
+        if (insertError) { setError(insertError.message); return }
+      } else {
+        const now = new Date().toISOString()
+        setState(previous => ({ ...previous, threads: [...previous.threads, { id: crypto.randomUUID(), title: trimmed, delegation, priority: Math.max(0, ...previous.threads.map(thread => thread.priority)) + 1024, created_at: now, updated_at: now }] }))
+      }
+      setTitle('')
+      setAdding(false)
+    } finally {
+      addingThreadRef.current = false
+      setAddingThread(false)
     }
-    setTitle('')
-    setAdding(false)
   }
 
   async function execute(id: string | null) {
@@ -220,7 +230,7 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div className="composer-actions"><button type="button" className="text-button" onClick={() => setAdding(false)}>キャンセル</button><button className="save-button">追加する</button></div>
+          <div className="composer-actions"><button type="button" className="text-button" onClick={() => setAdding(false)} disabled={addingThread}>キャンセル</button><button className="save-button" disabled={addingThread}>{addingThread ? '追加中…' : '追加する'}</button></div>
           </div>
         </form>
       )}
