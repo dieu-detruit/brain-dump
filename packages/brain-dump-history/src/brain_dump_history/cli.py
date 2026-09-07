@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 from pathlib import Path
 
 from brain_dump_sdk import auth
 
+from . import env
 from .archive import Archive
 from .sync import HistorySync, required_env
 
@@ -83,21 +83,28 @@ async def run(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Archive Brain Dump history")
     parser.add_argument("command", choices=("sync", "watch", "login"), nargs="?", default="watch")
-    parser.add_argument("--repository", type=Path, required=True)
+    # required only for sync/watch (argparse-level `required=True` would also
+    # demand it for `login`, which never touches the repository)
+    parser.add_argument("--repository", type=Path, default=None)
     parser.add_argument("--token-file", type=Path)
     parser.add_argument("--no-commit", action="store_true")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--manual-code", action="store_true")
     args = parser.parse_args()
     if args.command == "login":
-        url = os.getenv("BRAIN_DUMP_URL", "")
-        key = os.getenv("BRAIN_DUMP_ANON_KEY", "")
+        url = env.get("BRAIN_DUMP_URL")
+        key = env.get("BRAIN_DUMP_ANON_KEY")
         if not url or not key or not args.token_file:
-            parser.error("login requires BRAIN_DUMP_URL, BRAIN_DUMP_ANON_KEY, and --token-file")
+            parser.error(
+                "login requires BRAIN_DUMP_URL, BRAIN_DUMP_ANON_KEY, and "
+                "--token-file (env vars or ~/.config/brain-dump/env)"
+            )
         refresh_token = auth.login(
             url, key, open_browser=not args.no_browser, manual_code=args.manual_code
         )
         auth.save_refresh_token(refresh_token, args.token_file)
         print(f"Saved history refresh token to {args.token_file}")
         return
+    if not args.repository:
+        parser.error("--repository is required for sync/watch")
     asyncio.run(run(args))

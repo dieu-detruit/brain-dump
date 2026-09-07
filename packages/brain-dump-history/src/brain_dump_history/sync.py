@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
 import httpx
 
+from . import env
 from .archive import Archive
 
 
@@ -83,11 +83,11 @@ class HistorySync:
 
 
 def required_env(token_file_override: Path | None = None) -> tuple[str, str, str, str | None]:
-    url = os.getenv("BRAIN_DUMP_URL", "")
-    key = os.getenv("BRAIN_DUMP_ANON_KEY", "")
-    access = os.getenv("BRAIN_DUMP_ACCESS_TOKEN", "")
-    refresh = os.getenv("BRAIN_DUMP_REFRESH_TOKEN")
-    token_file = str(token_file_override) if token_file_override else os.getenv("BRAIN_DUMP_TOKEN_FILE")
+    url = env.get("BRAIN_DUMP_URL")
+    key = env.get("BRAIN_DUMP_ANON_KEY")
+    access = env.get("BRAIN_DUMP_ACCESS_TOKEN")
+    refresh = env.get("BRAIN_DUMP_REFRESH_TOKEN") or None
+    token_file = str(token_file_override) if token_file_override else env.get("BRAIN_DUMP_TOKEN_FILE")
     if not refresh and token_file:
         path = Path(token_file).expanduser()
         if path.exists():
