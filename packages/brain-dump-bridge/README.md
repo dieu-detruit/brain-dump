@@ -37,16 +37,19 @@ Brain Dump の**ローカル受け口・デーモン**。外部の汎用 push（
 ## API
 
 ```
-POST /items    {"title": "何かやること"}        → 202 {"ok":true,"id":<thread_id>}
-GET  /health                                    → 200 {"ok":true}
+POST /items    {"title": "何かやること"}          → 202 {"ok":true,"id":<thread_id>, "title":"...", "delegation": null|"ai"|"colleague"}
+GET  /health                                      → 200 {"ok":true}
 ```
 
-受けるのは `title` のみ（他フィールドは無視）。delegation は null で追加されます。
+受け取る実質フィールドは `title` と `delegation`（任意）。
+`delegation` は省略時 `null`（未委譲）。`"ai"` / `"colleague"` を渡すと
+Thread がその担当に割り当てられます（例: AI エージェントへのレビュー委譲）。
+それ以外のフィールド（`url` / `repo` 等）は無視されます。
 
 ## 送信例（ai-watanabe-agent の `review.push_url` 等 `POST http://127.0.0.1:8877/items`）
 
 ```sh
 curl -X POST http://127.0.0.1:8877/items \
   -H 'Content-Type: application/json' \
-  -d '{"title":"matter port remap","url":"...","repo":"..."}'
+  -d '{"title":"review: matter port remap","delegation":"ai","url":"...","repo":"..."}'
 ```

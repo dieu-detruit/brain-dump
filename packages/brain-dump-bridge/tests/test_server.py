@@ -66,6 +66,68 @@ def test_post_items_creates_thread() -> None:
         server.shutdown()
 
 
+def test_post_items_passes_delegation_through() -> None:
+    rpc_bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/v1/token":
+            return httpx.Response(200, json={
+                "access_token": "fresh", "refresh_token": "rt2",
+                "expires_in": 3600, "token_type": "bearer",
+                "user": {"id": "u1"}})
+        rpc_bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={**_thread_payload(), "delegation": "ai"})
+
+    server, url = _start(httpx.MockTransport(handler))
+    try:
+        with httpx.Client() as http:
+            response = http.post(
+                f"{url}/items",
+                json={"title": "Review the PR", "delegation": "ai"})
+            assert response.status_code == 202
+            assert response.json()["delegation"] == "ai"
+    finally:
+        server.shutdown()
+    assert rpc_bodies[-1]["assigned_to"] == "ai"
+
+
+def test_post_items_omitted_delegation_stays_null() -> None:
+    rpc_bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/v1/token":
+            return httpx.Response(200, json={
+                "access_token": "fresh", "refresh_token": "rt2",
+                "expires_in": 3600, "token_type": "bearer",
+                "user": {"id": "u1"}})
+        rpc_bodies.append(json.loads(request.content))
+        return httpx.Response(200, json=_thread_payload())
+
+    server, url = _start(httpx.MockTransport(handler))
+    try:
+        with httpx.Client() as http:
+            response = http.post(f"{url}/items", json={"title": "Generic item"})
+            assert response.status_code == 202
+            assert response.json()["delegation"] is None
+    finally:
+        server.shutdown()
+    assert rpc_bodies[-1]["assigned_to"] is None
+
+
+def test_post_items_rejects_invalid_delegation() -> None:
+    server, url = _start(httpx.MockTransport(
+        lambda r: httpx.Response(204)))  # never reached
+    try:
+        with httpx.Client() as http:
+            response = http.post(
+                f"{url}/items",
+                json={"title": "x", "delegation": "human"})
+            assert response.status_code == 400
+            assert "delegation" in response.json()["error"]
+    finally:
+        server.shutdown()
+
+
 def test_post_items_requires_title() -> None:
     server, url = _start(httpx.MockTransport(
         lambda r: httpx.Response(204)))  # never reached

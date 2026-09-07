@@ -60,9 +60,16 @@ class ItemHandler(BaseHTTPRequestHandler):
             self._json(400, {"error": "field `title` is required"})
             return
 
+        # Optional delegation: who the thread is assigned to ("ai"/"colleague").
+        # Omitted => null (unchanged for generic pushes).
+        delegation = payload.get("delegation")
+        if delegation not in (None, "ai", "colleague"):
+            self._json(400, {"error": "delegation must be null, 'ai', or 'colleague'"})
+            return
+
         bridge = self._bridge()
         try:
-            thread = bridge.client().add_thread(title)
+            thread = bridge.client().add_thread(title, delegation=delegation)
         except ValueError as error:  # SDK-side validation
             self._json(400, {"error": str(error)})
             return
@@ -76,7 +83,8 @@ class ItemHandler(BaseHTTPRequestHandler):
             return
 
         log.info("added thread %s: %s", thread.id, title)
-        self._json(202, {"ok": True, "id": thread.id, "title": title})
+        self._json(202, {"ok": True, "id": thread.id, "title": title,
+                         "delegation": thread.delegation})
 
     # -- helpers ---------------------------------------------------------------
     def _bridge(self) -> Bridge:
