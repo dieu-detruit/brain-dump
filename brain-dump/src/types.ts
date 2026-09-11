@@ -19,6 +19,7 @@ export interface ExecutionSession {
   thread_id: string
   thread_title: string
   started_at: string
+  last_confirmed_at: string
   ended_at: string | null
 }
 

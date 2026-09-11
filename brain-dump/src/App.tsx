@@ -6,6 +6,8 @@ import { loadLocal, saveLocal } from './lib/localStore'
 import type { BrainState, ChangeLog, Delegation, ExecutionSession, Thread } from './types'
 
 const emptyState: BrainState = { threads: [], executingThreadId: null }
+const confirmationInterval = 60 * 60 * 1000
+const confirmationWarning = 5 * 60 * 1000
 
 function delegationLabel(value: Delegation) {
   return value === 'ai' ? 'AI' : value === 'colleague' ? '他の人' : '寝かせる'
@@ -31,6 +33,9 @@ export default function App() {
   const [sessions, setSessions] = useState<ExecutionSession[]>([])
   const [changes, setChanges] = useState<ChangeLog[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [lastConfirmedAt, setLastConfirmedAt] = useState<number | null>(null)
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const addingThreadRef = useRef(false)
 
   const userId = session?.user.id
@@ -50,7 +55,7 @@ export default function App() {
     if (!supabase || !userId) return
     setHistoryLoading(true)
     const [{ data: sessionData, error: sessionError }, { data: changeData, error: changeError }] = await Promise.all([
-      supabase.from('execution_sessions').select('id,thread_id,thread_title,started_at,ended_at').order('started_at', { ascending: false }),
+      supabase.from('execution_sessions').select('id,thread_id,thread_title,started_at,last_confirmed_at,ended_at').order('started_at', { ascending: false }),
       supabase.from('change_log').select('id,entity_type,entity_id,operation,changed_at,before_data,after_data').order('changed_at', { ascending: false }).limit(100),
     ])
     if (sessionError || changeError) setError(sessionError?.message ?? changeError?.message ?? '履歴を読み込めませんでした')
@@ -93,6 +98,36 @@ export default function App() {
     return () => { void supabase?.removeChannel(channel) }
   }, [fetchHistory, userId])
 
+  const activeExecution = sessions.find(item => item.ended_at === null && item.thread_id === state.executingThreadId)
+
+  useEffect(() => {
+    if (!state.executingThreadId) {
+      setLastConfirmedAt(null)
+      setConfirmationOpen(false)
+      return
+    }
+    if (activeExecution) setLastConfirmedAt(new Date(activeExecution.last_confirmed_at).getTime())
+  }, [activeExecution, state.executingThreadId])
+
+  const sleepUnconfirmedExecution = useCallback(async () => {
+    if (!supabase || !userId) return
+    setConfirmationOpen(false)
+    const { error: sleepError } = await supabase.rpc('sleep_unconfirmed_execution')
+    if (sleepError) { setError(sleepError.message); return }
+    setState(previous => ({ ...previous, executingThreadId: null }))
+    void fetchState()
+    void fetchHistory()
+  }, [fetchHistory, fetchState, userId])
+
+  useEffect(() => {
+    if (!state.executingThreadId || !lastConfirmedAt) return
+    const elapsed = Date.now() - lastConfirmedAt
+    if (elapsed >= confirmationInterval) { void sleepUnconfirmedExecution(); return }
+    const warningTimer = confirmationOpen ? undefined : window.setTimeout(() => setConfirmationOpen(true), Math.max(0, confirmationInterval - confirmationWarning - elapsed))
+    const sleepTimer = window.setTimeout(() => void sleepUnconfirmedExecution(), Math.max(0, confirmationInterval - elapsed))
+    return () => { if (warningTimer) window.clearTimeout(warningTimer); window.clearTimeout(sleepTimer) }
+  }, [confirmationOpen, lastConfirmedAt, sleepUnconfirmedExecution, state.executingThreadId])
+
   const sleeping = state.threads.filter(t => t.delegation === null)
   const delegated = state.threads.filter(t => t.delegation !== null)
 
@@ -127,7 +162,19 @@ export default function App() {
     if (supabase && userId) {
       const { error: updateError } = await supabase.from('brain_state').upsert({ user_id: userId, executing_thread_id: nextId })
       if (updateError) { setError(updateError.message); void fetchState() }
+      else if (nextId) setLastConfirmedAt(Date.now())
     }
+  }
+
+  async function confirmExecution() {
+    if (!supabase || !userId) return
+    setConfirming(true)
+    const { data, error: confirmationError } = await supabase.rpc('confirm_execution')
+    setConfirming(false)
+    if (confirmationError) { setError(confirmationError.message); return }
+    setLastConfirmedAt(data ? new Date(data).getTime() : Date.now())
+    setConfirmationOpen(false)
+    void fetchHistory()
   }
 
   async function remove(thread: Thread) {
@@ -204,6 +251,8 @@ export default function App() {
 
       {error && <div className="error-banner">{error}<button onClick={() => setError(null)}><X size={16} /></button></div>}
 
+      {confirmationOpen && <ExecutionConfirmationDialog onConfirm={confirmExecution} confirming={confirming} />}
+
       {historyOpen ? <HistoryView sessions={sessions} changes={changes} loading={historyLoading} /> : <>
       <div className="toolbar">
         <div><span className="count">{state.threads.length}</span><span className="muted"> threads</span></div>
@@ -248,8 +297,19 @@ export default function App() {
 
 function durationSeconds(session: ExecutionSession, now: number) {
   const started = new Date(session.started_at).getTime()
-  const ended = session.ended_at ? new Date(session.ended_at).getTime() : now
+  const ended = session.ended_at ? new Date(session.ended_at).getTime() : Math.min(now, new Date(session.last_confirmed_at).getTime())
   return Math.max(0, Math.round((ended - started) / 1000))
+}
+
+function ExecutionConfirmationDialog({ onConfirm, confirming }: { onConfirm: () => void; confirming: boolean }) {
+  return <div className="dialog-backdrop execution-confirmation" role="presentation">
+    <section className="edit-dialog" role="dialog" aria-modal="true" aria-labelledby="execution-confirmation-title">
+      <p className="eyebrow">EXECUTION CHECK-IN</p>
+      <h2 id="execution-confirmation-title">まだ取り組んでいますか？</h2>
+      <p>続ける場合は、5分以内に確認してください。確認がない場合、実行は前回の確認時刻で待機に戻ります。</p>
+      <div className="dialog-actions"><button className="save-button" onClick={onConfirm} disabled={confirming}>{confirming ? '確認中…' : '続けている'}</button></div>
+    </section>
+  </div>
 }
 
 function formatDuration(seconds: number) {
