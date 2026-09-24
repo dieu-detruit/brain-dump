@@ -1,0 +1,35 @@
+name: Watch simulator
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/watch-app]
+    paths:
+      - brain-dump-watch/**
+      - .github/workflows/watch.yml
+permissions:
+  contents: read
+concurrency:
+  group: watch-simulator-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  watch:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+      - name: Build and test Watch app without signing
+        run: bash brain-dump-watch/scripts/test.sh
+      - name: Save XCTest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-tests
+          path: /tmp/watch-tests-local.xcresult
+          retention-days: 7
+          if-no-files-found: ignore

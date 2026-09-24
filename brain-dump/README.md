@@ -72,3 +72,10 @@ curl -X POST "$SUPABASE_URL/rest/v1/rpc/add_thread" \
 ## DBの変化をローカルGitで追う
 
 最新のmigrationを反映すると、変更履歴とThread別の実行時間がDBへ記録されます。subscribe・ローカルへの書き出しを行うコードは`../packages/brain-dump-history`に置き、履歴データとそのGit履歴だけを独立した`brain-dump-history` repositoryで管理します。
+
+## Apple Watch
+
+Watch版は継続確認への回答とThreadの切り替えを提供します。
+Webのヘッダーの「Watch」から端末を登録・解除します。
+Webの更新前に20260924のmigrationを適用してください。
+[Watchアプリとビルド](../brain-dump-watch/README.md)・[導入と実機チェック](../docs/watch-rollout.md)を参照してください。

@@ -50,3 +50,10 @@ h1 { margin:0; font-size:clamp(28px,5vw,42px); line-height:1.2; letter-spacing:-
 .execution-confirmation { z-index:30; }.execution-confirmation h2 { margin:0; font-size:22px; letter-spacing:-.03em; }.execution-confirmation p:not(.eyebrow) { margin:14px 0 0; color:#706b62; line-height:1.7; font-size:14px; }.execution-confirmation .dialog-actions { margin-top:24px; }.execution-confirmation .save-button { padding:11px 16px; }
 @media(max-width:520px){.app-shell{padding-left:16px;padding-right:16px}.demo-badge{display:none}.execution-principle{margin-bottom:24px;font-size:15px}.execution-principle strong{display:block}.group-title span{display:none}.delete-button{opacity:1}.edit-icon{opacity:.65}.thread-card{min-height:72px}.login{padding:26px}.delegation-picker button{width:44px;height:44px;flex:0 0 44px;justify-content:center}.composer-actions{margin-top:0}.history-summary{grid-template-columns:1fr}.history-summary > div{min-height:77px}.history-button{padding:8px}.day-chart{gap:5px}.history-heading span{display:none}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.watch-devices { max-height: 85dvh; overflow-y: auto; }
+.watch-devices form { display: flex; align-items: end; gap: 12px; margin: 20px 0; }
+.watch-devices label { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.watch-devices input { width: 100%; letter-spacing: .15em; }
+.watch-devices ul { list-style: none; padding: 0; }
+.watch-devices li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; }

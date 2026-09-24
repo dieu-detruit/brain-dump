@@ -3,6 +3,8 @@ import { BarChart3, Bot, CircleUserRound, GripVertical, LogOut, Moon, Pencil, Pl
 import type { Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { loadLocal, saveLocal } from './lib/localStore'
+import { WatchDevices } from './features/watch/WatchDevices'
+import { executionCommand, stateFromSnapshot, type ExecutionSnapshot, type ExecutionResult } from './lib/execution'
 import type { BrainState, ChangeLog, Delegation, ExecutionSession, Thread } from './types'
 
 const emptyState: BrainState = { threads: [], executingThreadId: null }
@@ -30,6 +32,13 @@ export default function App() {
   const [loading, setLoading] = useState(isSupabaseConfigured)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [watchOpen, setWatchOpen] = useState(false)
+  const [snapshot, setSnapshot] = useState<ExecutionSnapshot | null>(null)
+  const commandBusy = useRef(false)
+  const requestSequence = useRef(0)
+  const historySequence = useRef(0)
+  const authUserRef = useRef<string | null>(null)
+  const [clockOffset, setClockOffset] = useState(0)
   const [sessions, setSessions] = useState<ExecutionSession[]>([])
   const [changes, setChanges] = useState<ChangeLog[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -40,24 +49,33 @@ export default function App() {
 
   const userId = session?.user.id
 
+  const acceptSnapshot = useCallback((next: ExecutionSnapshot) => {
+    setSnapshot(next)
+    setState(stateFromSnapshot(next))
+    setClockOffset(new Date(next.server_time).getTime() - Date.now())
+    setLastConfirmedAt(next.active ? new Date(next.active.last_confirmed_at).getTime() : null)
+    setConfirmationOpen(Boolean(next.active && new Date(next.server_time).getTime() - new Date(next.active.last_confirmed_at).getTime() >= confirmationInterval - confirmationWarning))
+  }, [])
+
   const fetchState = useCallback(async () => {
     if (!supabase || !userId) return
-    const [{ data: threads, error: threadError }, { data: appState, error: stateError }] = await Promise.all([
-      supabase.from('threads').select('id,title,delegation,priority,created_at,updated_at').order('priority').order('created_at'),
-      supabase.from('brain_state').select('executing_thread_id').maybeSingle(),
-    ])
-    if (threadError || stateError) setError(threadError?.message ?? stateError?.message ?? '読み込めませんでした')
-    else setState({ threads: (threads ?? []) as Thread[], executingThreadId: appState?.executing_thread_id ?? null })
+    const sequence = ++requestSequence.current
+    const {data, error: fetchError} = await supabase.rpc('execution_snapshot')
+    if (sequence !== requestSequence.current) return
+    if (fetchError) setError(fetchError.message)
+    else if (data) acceptSnapshot(data as ExecutionSnapshot)
     setLoading(false)
-  }, [userId])
+  }, [userId, acceptSnapshot])
 
   const fetchHistory = useCallback(async () => {
     if (!supabase || !userId) return
     setHistoryLoading(true)
+    const sequence = ++historySequence.current
     const [{ data: sessionData, error: sessionError }, { data: changeData, error: changeError }] = await Promise.all([
       supabase.from('execution_sessions').select('id,thread_id,thread_title,started_at,last_confirmed_at,ended_at').order('started_at', { ascending: false }),
       supabase.from('change_log').select('id,entity_type,entity_id,operation,changed_at,before_data,after_data').order('changed_at', { ascending: false }).limit(100),
     ])
+    if (sequence !== historySequence.current) return
     if (sessionError || changeError) setError(sessionError?.message ?? changeError?.message ?? '履歴を読み込めませんでした')
     else {
       setSessions((sessionData ?? []) as ExecutionSession[])
@@ -68,8 +86,26 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setAuthReady(true) })
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => { setSession(next); setAuthReady(true) })
+    const applySession = (next: Session | null) => {
+      if (authUserRef.current !== (next?.user.id ?? null)) {
+        authUserRef.current = next?.user.id ?? null
+        ++requestSequence.current
+        ++historySequence.current
+        setSnapshot(null)
+        setState(emptyState)
+        setSessions([])
+        setChanges([])
+        setWatchOpen(false)
+        setLastConfirmedAt(null)
+        setConfirmationOpen(false)
+        setError(null)
+      }
+      setSession(next)
+      setAuthReady(true)
+    }
+    let receivedAuthEvent = false
+    supabase.auth.getSession().then(({data}) => { if (!receivedAuthEvent) applySession(data.session) })
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => { receivedAuthEvent = true; applySession(next) })
     return () => data.subscription.unsubscribe()
   }, [])
 
@@ -84,6 +120,7 @@ export default function App() {
     const channel = supabase.channel(`brain-dump-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'threads', filter: `user_id=eq.${userId}` }, fetchState)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'brain_state', filter: `user_id=eq.${userId}` }, fetchState)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'execution_sessions', filter: `user_id=eq.${userId}` }, fetchState)
       .subscribe()
     return () => { void supabase?.removeChannel(channel) }
   }, [fetchState, userId])
@@ -98,35 +135,23 @@ export default function App() {
     return () => { void supabase?.removeChannel(channel) }
   }, [fetchHistory, userId])
 
-  const activeExecution = sessions.find(item => item.ended_at === null && item.thread_id === state.executingThreadId)
-
-  useEffect(() => {
-    if (!state.executingThreadId) {
-      setLastConfirmedAt(null)
-      setConfirmationOpen(false)
-      return
-    }
-    if (activeExecution) setLastConfirmedAt(new Date(activeExecution.last_confirmed_at).getTime())
-  }, [activeExecution, state.executingThreadId])
-
   const sleepUnconfirmedExecution = useCallback(async () => {
     if (!supabase || !userId) return
     setConfirmationOpen(false)
     const { error: sleepError } = await supabase.rpc('sleep_unconfirmed_execution')
     if (sleepError) { setError(sleepError.message); return }
-    setState(previous => ({ ...previous, executingThreadId: null }))
-    void fetchState()
+    await fetchState()
     void fetchHistory()
   }, [fetchHistory, fetchState, userId])
 
   useEffect(() => {
     if (!state.executingThreadId || !lastConfirmedAt) return
-    const elapsed = Date.now() - lastConfirmedAt
+    const elapsed = Date.now() + clockOffset - lastConfirmedAt
     if (elapsed >= confirmationInterval) { void sleepUnconfirmedExecution(); return }
     const warningTimer = confirmationOpen ? undefined : window.setTimeout(() => setConfirmationOpen(true), Math.max(0, confirmationInterval - confirmationWarning - elapsed))
     const sleepTimer = window.setTimeout(() => void sleepUnconfirmedExecution(), Math.max(0, confirmationInterval - elapsed))
     return () => { if (warningTimer) window.clearTimeout(warningTimer); window.clearTimeout(sleepTimer) }
-  }, [confirmationOpen, lastConfirmedAt, sleepUnconfirmedExecution, state.executingThreadId])
+  }, [confirmationOpen, lastConfirmedAt, sleepUnconfirmedExecution, state.executingThreadId, clockOffset])
 
   const sleeping = state.threads.filter(t => t.delegation === null)
   const delegated = state.threads.filter(t => t.delegation !== null)
@@ -156,26 +181,32 @@ export default function App() {
     }
   }
 
-  async function execute(id: string | null) {
-    const nextId = state.executingThreadId === id ? null : id
-    setState(previous => ({ ...previous, executingThreadId: nextId }))
-    if (supabase && userId) {
-      const { error: updateError } = await supabase.from('brain_state').upsert({ user_id: userId, executing_thread_id: nextId })
-      if (updateError) { setError(updateError.message); void fetchState() }
-      else if (nextId) setLastConfirmedAt(Date.now())
+  async function runCommand(action: 'confirm' | 'switch', target?: string | null) {
+    if (!supabase || !snapshot || commandBusy.current) return
+    commandBusy.current = true
+    setConfirming(true)
+    setError(null)
+    ++requestSequence.current
+    try {
+      const {data, error: commandError} = await supabase.rpc('apply_execution_command', {command: executionCommand(action, snapshot, target)})
+      if (commandError) { setError(commandError.message); return }
+      const result = data as ExecutionResult
+      if (result.status !== 'applied') setError('実行状況が変わりました。最新の状態を確認してください。')
+    } finally {
+      await fetchState()
+      void fetchHistory()
+      commandBusy.current = false
+      setConfirming(false)
     }
   }
 
-  async function confirmExecution() {
-    if (!supabase || !userId) return
-    setConfirming(true)
-    const { data, error: confirmationError } = await supabase.rpc('confirm_execution')
-    setConfirming(false)
-    if (confirmationError) { setError(confirmationError.message); return }
-    setLastConfirmedAt(data ? new Date(data).getTime() : Date.now())
-    setConfirmationOpen(false)
-    void fetchHistory()
+  async function execute(id: string | null) {
+    const nextId = state.executingThreadId === id ? null : id
+    if (supabase && userId) await runCommand('switch', nextId)
+    else setState(previous => ({...previous, executingThreadId: nextId}))
   }
+
+  async function confirmExecution() { await runCommand('confirm') }
 
   async function remove(thread: Thread) {
     setState(previous => ({ threads: previous.threads.filter(t => t.id !== thread.id), executingThreadId: previous.executingThreadId === thread.id ? null : previous.executingThreadId }))
@@ -243,6 +274,7 @@ export default function App() {
         <div className="header-actions">
           {!isSupabaseConfigured && <span className="demo-badge">この端末に保存</span>}
           {isSupabaseConfigured && <button className={`history-button ${historyOpen ? 'selected' : ''}`} onClick={() => setHistoryOpen(open => !open)}><BarChart3 size={18} /> 記録</button>}
+          {session && <button className="text-button" onClick={() => setWatchOpen(true)}>Watch</button>}
           {session && <button className="icon-button" aria-label="ログアウト" onClick={() => supabase?.auth.signOut()}><LogOut size={19} /></button>}
         </div>
       </header>
@@ -251,6 +283,7 @@ export default function App() {
 
       {error && <div className="error-banner">{error}<button onClick={() => setError(null)}><X size={16} /></button></div>}
 
+      {watchOpen && session && <WatchDevices key={session.user.id} onClose={() => setWatchOpen(false)} />}
       {confirmationOpen && <ExecutionConfirmationDialog onConfirm={confirmExecution} confirming={confirming} />}
 
       {historyOpen ? <HistoryView sessions={sessions} changes={changes} loading={historyLoading} /> : <>

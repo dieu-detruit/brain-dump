@@ -1,0 +1,13 @@
+project_id = "brain-dump-watch-local"
+[api]
+port = 55321
+schemas = ["public", "graphql_public"]
+[db]
+port = 55322
+major_version = 17
+[studio]
+port = 55323
+[functions.watch-api]
+verify_jwt = false
+[functions.watch-notifications]
+verify_jwt = false

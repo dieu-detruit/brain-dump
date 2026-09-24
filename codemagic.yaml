@@ -1,0 +1,43 @@
+workflows:
+  watch-simulator:
+    name: Watch simulator tests (unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    environment:
+      xcode: 26.3
+    scripts:
+      - name: Generate and test watchOS project
+        script: |
+          brew install xcodegen
+          bash brain-dump-watch/scripts/test.sh
+    artifacts:
+      - '*.xcresult'
+  watch-testflight:
+    name: Watch TestFlight (manual)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+    integrations:
+      app_store_connect: brain-dump
+    environment:
+      xcode: 26.3
+      groups:
+        - brain-dump-watch
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: "$APP_BUNDLE_ID*"
+    scripts:
+      - name: Prepare and archive
+        script: |
+          brew install xcodegen
+          keychain initialize
+          keychain add-certificates
+          bash brain-dump-watch/scripts/archive.sh
+    artifacts:
+      - /tmp/watch-export/*.ipa
+      - /tmp/BrainDumpWatch.xcarchive
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal

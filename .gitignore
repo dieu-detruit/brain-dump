@@ -15,3 +15,12 @@ __pycache__/
 
 # Separate local repository containing personal DB history
 /brain-dump-history/
+
+# Generated watchOS projects and build artifacts
+brain-dump-watch/*.xcodeproj/
+*.xcresult/
+*.xcarchive/
+*.ipa
+.DS_Store
+
+brain-dump-watch/Generated/

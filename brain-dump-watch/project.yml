@@ -1,0 +1,74 @@
+name: BrainDumpWatch
+options:
+  bundleIdPrefix: dev.braindump
+  deploymentTarget:
+    watchOS: '10.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: $(APPLE_TEAM_ID)
+    WATCH_API_URL: $(BRAIN_DUMP_WATCH_API_URL)
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: 1
+targets:
+  BrainDumpWatch:
+    type: application
+    platform: watchOS
+    sources: [Sources, Resources]
+    info:
+      path: Generated/Watch-Info.plist
+      properties:
+        CFBundleDisplayName: Brain Dump
+        WKApplication: true
+        WKWatchOnly: true
+        WatchAPIURL: $(BRAIN_DUMP_WATCH_API_URL)
+        APNSEnvironment: $(APNS_ENVIRONMENT)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(WATCH_BUNDLE_ID)
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: BrainDumpWatch.entitlements
+    scheme:
+      testTargets: [BrainDumpWatchTests]
+  BrainDumpWatchTests:
+    type: bundle.unit-test
+    platform: watchOS
+    sources: [Tests]
+    dependencies:
+      - target: BrainDumpWatch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.braindump.watch.tests
+  BrainDumpContainer:
+    type: application.watchapp2-container
+    platform: iOS
+    deploymentTarget: '17.0'
+    sources: [ContainerResources]
+    info:
+      path: Generated/Container-Info.plist
+      properties:
+        CFBundleDisplayName: Brain Dump
+        ITSWatchOnlyContainer: true
+        LSApplicationLaunchProhibited: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: BrainDumpWatch
+        embed: true
+        copy:
+          destination: productsDirectory
+          subpath: $(CONTENTS_FOLDER_PATH)/Watch
+schemes:
+  BrainDumpContainer:
+    build:
+      targets:
+        BrainDumpContainer: all
+    archive:
+      config: Release
