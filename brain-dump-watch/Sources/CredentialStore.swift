@@ -2,6 +2,12 @@ import Foundation
 import Security
 import CryptoKit
 
+struct KeychainError: Error, LocalizedError {
+    let operation: String
+    let status: OSStatus
+    var errorDescription: String? { APIError.credentials.errorDescription }
+}
+
 struct WatchCredentials: Codable {
     let pairingSecret: String
     let deviceToken: String
@@ -43,7 +49,8 @@ final class CredentialStore: CredentialStorage {
         var result: CFTypeRef?
         let status = SecItemCopyMatching(q as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else { throw APIError.credentials }
+        guard status == errSecSuccess else { throw KeychainError(operation: "load", status: status) }
+        guard let data = result as? Data else { throw APIError.credentials }
         return try JSONDecoder().decode(WatchCredentials.self, from: data)
     }
     func save(_ value: WatchCredentials) throws {
@@ -56,12 +63,12 @@ final class CredentialStore: CredentialStorage {
         if status == errSecItemNotFound {
             status = SecItemAdd(query.merging(attributes) { _, new in new } as CFDictionary, nil)
         }
-        guard status == errSecSuccess else { throw APIError.credentials }
+        guard status == errSecSuccess else { throw KeychainError(operation: "save", status: status) }
     }
     func clear() throws {
         lock.lock(); defer { lock.unlock() }
         let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else { throw APIError.credentials }
+        guard status == errSecSuccess || status == errSecItemNotFound else { throw KeychainError(operation: "clear", status: status) }
     }
     func clear(ifTokenMatches token: String) throws -> Bool {
         lock.lock(); defer { lock.unlock() }

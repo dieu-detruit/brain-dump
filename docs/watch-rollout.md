@@ -88,12 +88,12 @@ APNsの410/BadDeviceTokenでは登録tokenを無効化します。Watchを開い
 
 ## 今回の実装上の判断
 
-- `.git`への書き込み制限によりworktree・commitは作らず、現在の作業ディレクトリに差分を保持。
+- worktreeは作らず現在の作業ディレクトリを使用。追加の権限で `feat/watch-app` ブランチへcommit・push済み。
 - DB検証はSupabase全体の起動に代えて、独立PostgreSQLと最小Auth fixtureを使用。実際のAuth/Vault/Cronの統合確認は導入時に必要。
 - 紐づけ開始は送信元IPを信用せず全体60回/時で制限。第三者が上限を使い切った場合は新規登録を待つ必要がある。
 - セッションを指定しない旧確認RPCは再読み込みを要求。古いWebキャッシュからの誤確認を防止するため。
 - Xcode 26.3とWatch-only配布コンテナを採用。動作下限はwatchOS 10のまま。署名は親App IDとWatch App IDの両方が必要。
-- ネイティブ検証はXCTestを含めてCodemagic接続後に実行。Linux側の成功結果からSwiftの成功を推測しない。
+- 公開リポジトリの標準GitHub Actions macOSランナーで未署名ビルド・XCTestを実行する。最初の検証にCodemagic登録やApple有料加入は不要。署名と実機配送は別途確認する。
 
 ## ローカル確認結果（2026-09-24）
 
