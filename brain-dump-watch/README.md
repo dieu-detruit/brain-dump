@@ -9,12 +9,17 @@ Linux側でWeb・Edgeのテスト、独立PostgreSQLでDB動作を検証しま�
 Swift/Xcodeのビルド、Codemagicの実行、署名・TestFlight導入、実機での通知配送は別途確認が必要です。
 ソースが存在することと実機動作の確認は別です。実施結果は `../docs/watch-rollout.md` を参照してください。
 
-## Macなしで未署名ビルド
+## Macなし・Apple登録なしでビルド
 
-1. この変更を含むリポジトリをCodemagicへ接続する。
-2. ルートの `codemagic.yaml` を選び、`watch-simulator` を手動実行する。
-3. 初期設定はXcode 26.3 / M2。選択肢にない場合はwatchOS 10以降のSDKを含む利用可能なXcodeへ更新する。
-4. XCTestとビルド結果を確認する。署名とApple有料加入はこのワークフローでは不要。
+この公開リポジトリでは `.github/workflows/watch.yml` が標準macOSランナーでビルドとXCTestを実行します。
+`feat/watch-app` へのWatch関連変更のpushで起動します。
+Appleの証明書・有料加入・Codemagic登録は不要です。
+シミュレーターのKeychain検証には、証明書不要のad hoc署名を使います。
+続いてWatch-only配布コンテナを未署名archiveし、Watchアプリが内包されることを確認します。
+実機へインストールできるIPAのexportは署名設定後に行います。
+
+Codemagicを使う場合はリポジトリを接続し、ルートの `codemagic.yaml` の `watch-simulator` を手動実行します。
+初期設定はXcode 26.3 / M2です。
 
 シミュレーター端末はインストール済みのwatchOS runtimeから選びます。
 XcodeGenはCIでインストールするため、初回は使用バージョンをログで確認し、成功した版を固定してください。
@@ -58,10 +63,3 @@ APNs側の `WATCH_BUNDLE_ID` は `${APP_BUNDLE_ID}.watchkitapp` と一致させ�
 
 現在の提出SDK要件に合わせてXcode 26.3を指定しています。
 [Appleの要件](https://developer.apple.com/news/?id=ueeok6yw)・[Codemagicの環境](https://docs.codemagic.io/specs-macos/xcode-26-3/)を参照してください。
-
-## GitHub Actions（公開リポジトリでの最初の検証）
-
-公開リポジトリであることを確認したため、最初の未署名ビルドには `.github/workflows/watch.yml` も用意しています。
-`feat/watch-app` へのWatch関連変更で実行され、Actions画面から手動実行もできます。
-標準macOSランナーでビルド・XCTestのみを行い、証明書・Apple加入・Codemagic登録は不要です。
-Codemagicの設定はTestFlight用を含めて残しています。

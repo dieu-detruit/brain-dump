@@ -23,8 +23,10 @@ jobs:
           xcodebuild -version
           brew install xcodegen
           xcodegen --version
-      - name: Build and test Watch app without signing
+      - name: Build and test Watch app without Apple credentials
         run: bash brain-dump-watch/scripts/test.sh
+      - name: Verify unsigned watch-only archive
+        run: bash brain-dump-watch/scripts/check-archive.sh
       - name: Save XCTest results
         if: always()
         uses: actions/upload-artifact@v4
