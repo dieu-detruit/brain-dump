@@ -1,6 +1,15 @@
 import XCTest
 @testable import BrainDumpWatch
 final class ModelsTests: XCTestCase {
+    func testConfirmationAppearsOnlyDuringResponseWindow() {
+        let active = ActiveExecution(sessionID: "1", confirmationRevision: "r", threadID: "t", lastConfirmedAt: "2026-09-25T00:00:00Z", deadline: "2026-09-25T01:00:00Z")
+        for (time, expected) in [("00:00:00", false), ("00:54:59", false), ("00:55:00", true), ("00:59:59.999", true), ("01:00:00", false)] {
+            XCTAssertEqual(Snapshot(serverTime: "2026-09-25T\(time)Z", threads: [], active: active).needsConfirmation, expected, time)
+        }
+        XCTAssertFalse(Snapshot(serverTime: "2026-09-25T00:56:00Z", threads: [], active: nil).needsConfirmation)
+        let renewed = ActiveExecution(sessionID: "1", confirmationRevision: "new", threadID: "t", lastConfirmedAt: "2026-09-25T00:56:00Z", deadline: "2026-09-25T01:56:00Z")
+        XCTAssertFalse(Snapshot(serverTime: "2026-09-25T00:56:00Z", threads: [], active: renewed).needsConfirmation)
+    }
     func testGroupsFollowWebDelegationAndPriority() {
         let snapshot = Snapshot(serverTime: "", threads: [
             BrainThread(id: "ai", title: "AI", delegation: "ai", priority: 3),

@@ -28,6 +28,16 @@ struct Snapshot: Codable {
     let serverTime: String
     let threads: [BrainThread]
     let active: ActiveExecution?
+    var needsConfirmation: Bool {
+        func date(_ value: String) -> Date? {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+        }
+        guard let active, let now = date(serverTime),
+              let confirmed = date(active.lastConfirmedAt), let deadline = date(active.deadline) else { return false }
+        return now.timeIntervalSince(confirmed) >= 55 * 60 && now < deadline
+    }
     var waitingThreads: [BrainThread] { threads.filter { $0.delegation == nil }.sorted { $0.priority < $1.priority } }
     var delegatedThreads: [BrainThread] { threads.filter { $0.delegation != nil }.sorted { $0.priority < $1.priority } }
     enum CodingKeys: String, CodingKey { case serverTime = "server_time", threads, active }

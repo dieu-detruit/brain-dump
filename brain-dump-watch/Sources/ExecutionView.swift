@@ -24,9 +24,12 @@ struct ExecutionView: View {
                         Text(thread.title)
                             .frame(maxWidth: .infinity, alignment: .leading).padding(12)
                             .foregroundStyle(WatchTheme.paper).background(WatchTheme.ink, in: RoundedRectangle(cornerRadius: 14))
-                        Button("続けている") { Task { await model.confirm() } }
-                            .tint(WatchTheme.orange)
-                            .disabled(model.isSending || model.isStale)
+                        if model.snapshot?.needsConfirmation == true {
+                            Text("まだやっている？").font(.footnote)
+                            Button("続けている") { Task { await model.confirm() } }
+                                .tint(WatchTheme.orange)
+                                .disabled(model.isSending || model.isStale)
+                        }
                     } else { Text("実行中のThreadはありません").font(.footnote) }
                     if model.isStale { Text("未更新").font(.footnote).foregroundStyle(WatchTheme.orange) }
                     if let notice = model.notice { Text(notice).font(.footnote) }
