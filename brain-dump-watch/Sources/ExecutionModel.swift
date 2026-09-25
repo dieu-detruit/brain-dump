@@ -91,7 +91,7 @@ final class ExecutionModel: ObservableObject {
         do {
             let result = try await api.apply(command, token: token)
             snapshot = result.snapshot
-            notice = result.status == "applied" ? (command.action == "confirm" ? "確認しました" : "切り替えました") : "実行状況が変わりました。選び直してください。"
+            notice = result.status == "applied" ? nil : "実行状況が変わりました。選び直してください。"
         } catch { failure(error) }
     }
     private func failure(_ error: Error) {

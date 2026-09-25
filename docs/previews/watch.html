@@ -155,10 +155,10 @@
         if (kind === 'switch') serverActive = target;
         if (['switch', 'confirm', 'notification-confirm'].includes(kind)) confirmationDue = false;
         active = serverActive;
-        message = kind === 'switch' ? '切り替えました' : kind === 'refresh' ? '最新の状態に更新しました' : '確認しました';
+        message = '';
         if (kind === 'notification-confirm') answered = true;
       }
-      event.textContent = failed ? '通信失敗。作業と確認時刻は変更していません。' : kind === 'switch' ? `「${threads[active].title}」へ切り替えました。` : kind === 'refresh' ? '最新の状態を取得しました。' : '継続の回答を受け付けました（デモ）。';
+      event.textContent = failed ? '通信失敗。作業と確認時刻は変更していません。' : '';
       render(); screen.scrollTop = 0;
     }, 500);
   }
