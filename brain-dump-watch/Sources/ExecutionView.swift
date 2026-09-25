@@ -18,23 +18,14 @@ struct ExecutionView: View {
                 if model.credentials?.deviceID == nil {
                     PairingView(credentials: model.credentials)
                 } else {
-                    heading("今やっている")
-                    if let active = model.snapshot?.active,
-                       let thread = model.snapshot?.threads.first(where: { $0.id == active.threadID }) {
-                        Text(thread.title)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                            .foregroundStyle(WatchTheme.paper).background(WatchTheme.ink, in: RoundedRectangle(cornerRadius: 14))
-                        if model.snapshot?.needsConfirmation == true {
-                            Text("まだやっている？").font(.footnote)
-                            Button("続けている") { Task { await model.confirm() } }
-                                .tint(WatchTheme.orange)
-                                .disabled(model.isSending || model.isStale)
-                        }
-                    } else { Text("実行中のThreadはありません").font(.footnote) }
+                    if model.snapshot?.needsConfirmation == true {
+                        Text("まだやっている？ 実行中の作業をタップして確認してください。")
+                            .font(.footnote).foregroundStyle(WatchTheme.orange)
+                    }
                     if model.isStale { Text("未更新").font(.footnote).foregroundStyle(WatchTheme.orange) }
                     if let notice = model.notice { Text(notice).font(.footnote) }
-                    threadGroup("待機中", caption: "まだ誰にも渡していない", threads: model.snapshot?.waitingThreads ?? [])
-                    threadGroup("進行中", caption: "AI・他の人に任せている", threads: model.snapshot?.delegatedThreads ?? [])
+                    threadGroup("待機中", threads: model.snapshot?.waitingThreads ?? [])
+                    threadGroup("進行中", threads: model.snapshot?.delegatedThreads ?? [])
                     if model.snapshot?.threads.isEmpty == true { Text("Web版でThreadを作成してください").font(.footnote) }
                     if model.notificationsDenied {
                         Text("通知がオフです。Watchの通知設定から許可してください。").font(.footnote)
@@ -65,27 +56,56 @@ struct ExecutionView: View {
     private func heading(_ title: String) -> some View {
         Text(title).font(.caption).foregroundStyle(WatchTheme.muted).padding(.top, 6)
     }
-    private func threadGroup(_ title: String, caption: String, threads: [BrainThread]) -> some View {
+    private func threadGroup(_ title: String, threads: [BrainThread]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             heading(title)
-            Text(caption).font(.caption2).foregroundStyle(WatchTheme.muted)
             if threads.isEmpty { Text("なし").font(.footnote).foregroundStyle(WatchTheme.muted) }
             ForEach(threads) { thread in
-                Button { Task { await model.switchTo(thread) } } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(thread.title).fixedSize(horizontal: false, vertical: true)
-                        if thread.id == model.snapshot?.active?.threadID {
-                            Text("今やっている").font(.caption2).foregroundStyle(WatchTheme.orange)
-                        } else if let delegation = thread.delegation {
-                            Text(delegation == "ai" ? "AI" : "他の人").font(.caption2).foregroundStyle(WatchTheme.muted)
-                        }
+                let active = thread.id == model.snapshot?.active?.threadID
+                Button { Task { await model.select(thread) } } label: {
+                    HStack(spacing: 7) {
+                        ZStack {
+                            Circle().stroke(active ? WatchTheme.orange : WatchTheme.muted, lineWidth: 1.5)
+                            Circle().fill(active ? WatchTheme.orange : WatchTheme.muted).frame(width: 5, height: 5)
+                        }.frame(width: 17, height: 17)
+                        Text(thread.title).font(.system(size: 14, weight: .medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        WatchDelegationIcon(delegation: thread.delegation)
+                            .foregroundStyle(active ? Color(red: 240 / 255, green: 179 / 255, blue: 159 / 255) : WatchTheme.muted)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
-                    .background(WatchTheme.card, in: RoundedRectangle(cornerRadius: 14))
+                    .padding(10).frame(minHeight: 48)
+                    .foregroundStyle(active ? WatchTheme.paper : WatchTheme.ink)
+                    .background(active ? WatchTheme.ink : WatchTheme.card, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
-                .disabled(model.isSending || model.isStale || thread.id == model.snapshot?.active?.threadID)
+                .accessibilityLabel("\(thread.title)、\(thread.delegation == "ai" ? "Agentに委任" : thread.delegation == "colleague" ? "他の人に委任" : "待機中")、\(active ? "実行中" : "未実行")")
+                .accessibilityHint(active ? "タップで継続を確認" : "タップでこの作業に切り替え")
+                .disabled(model.isSending || model.isStale)
             }
         }
+    }
+}
+
+// A small outlined robot retains the same delegation vocabulary as the web's Bot icon.
+private struct WatchDelegationIcon: View {
+    let delegation: String?
+    var body: some View {
+        Group {
+            if delegation == "ai" {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 3).stroke(lineWidth: 1.5).frame(width: 16, height: 13).offset(y: 2)
+                    Path { path in
+                        path.move(to: CGPoint(x: 10, y: 5)); path.addLine(to: CGPoint(x: 10, y: 1)); path.addLine(to: CGPoint(x: 7, y: 1))
+                        path.move(to: CGPoint(x: 0, y: 9)); path.addLine(to: CGPoint(x: 0, y: 14))
+                        path.move(to: CGPoint(x: 20, y: 9)); path.addLine(to: CGPoint(x: 20, y: 14))
+                        path.move(to: CGPoint(x: 7, y: 10)); path.addLine(to: CGPoint(x: 7, y: 13))
+                        path.move(to: CGPoint(x: 13, y: 10)); path.addLine(to: CGPoint(x: 13, y: 13))
+                    }.stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                }
+            } else {
+                Image(systemName: delegation == "colleague" ? "person" : "moon").font(.system(size: 18))
+            }
+        }.frame(width: 20, height: 20).accessibilityHidden(true)
     }
 }

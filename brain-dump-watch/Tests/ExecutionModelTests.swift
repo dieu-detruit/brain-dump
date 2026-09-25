@@ -1,6 +1,19 @@
 import XCTest
 @testable import BrainDumpWatch
 @MainActor final class ExecutionModelTests: XCTestCase {
+    func testTappingCurrentThreadConfirmsAndOtherThreadSwitches() async {
+        let api = FakeAPI()
+        let model = ExecutionModel(api: api, store: MemoryStore(WatchCredentials(pairingSecret: "s", deviceToken: "t", deviceID: "d")), requestNotifications: { false })
+        await model.refresh()
+        await model.select(model.snapshot!.threads[0])
+        XCTAssertEqual(api.commands.last?.action, "confirm")
+        XCTAssertEqual(api.commands.last?.expected?.sessionID, "1")
+        XCTAssertNil(api.commands.last?.targetThreadID)
+        await model.refresh()
+        await model.select(BrainThread(id: "other", title: "別作業", delegation: "ai", priority: 2))
+        XCTAssertEqual(api.commands.last?.action, "switch")
+        XCTAssertEqual(api.commands.last?.targetThreadID, "other")
+    }
     func testFailedConfirmationNeverLooksSuccessful() async {
         let api = FakeAPI()
         let store = MemoryStore(WatchCredentials(pairingSecret: "s", deviceToken: "t", deviceID: "d"))
@@ -40,10 +53,11 @@ private final class MemoryStore: CredentialStorage {
     }
 }
 private final class FakeAPI: WatchAPI {
+    var commands: [Mutation] = []
     func snapshot(token: String) async throws -> Snapshot {
         Snapshot(serverTime: "2026-09-24T00:00:00Z", threads: [BrainThread(id: "t", title: "作業", delegation: nil, priority: 1)], active: ActiveExecution(sessionID: "1", confirmationRevision: "r", threadID: "t", lastConfirmedAt: "2026-09-24T00:00:00Z", deadline: "2026-09-24T01:00:00Z"))
     }
-    func apply(_ command: Mutation, token: String) async throws -> MutationResult { throw APIError.unavailable }
+    func apply(_ command: Mutation, token: String) async throws -> MutationResult { commands.append(command); throw APIError.unavailable }
     func startPairing(_ credentials: WatchCredentials) async throws -> PairingReply { throw APIError.unavailable }
     func pairingStatus(_ credentials: WatchCredentials) async throws -> PairingStatus { PairingStatus(status: "approved", deviceID: "approved-device") }
     func registerPush(_ pushToken: String, token: String) async throws {}

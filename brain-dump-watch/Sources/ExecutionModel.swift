@@ -73,6 +73,10 @@ final class ExecutionModel: ObservableObject {
         guard let active = snapshot?.active else { return }
         await perform(Mutation(operationID: UUID().uuidString, action: "confirm", expected: active.expected, targetThreadID: nil))
     }
+    func select(_ thread: BrainThread) async {
+        if thread.id == snapshot?.active?.threadID { await confirm() }
+        else { await switchTo(thread) }
+    }
     func switchTo(_ thread: BrainThread) async {
         guard thread.id != snapshot?.active?.threadID else { return }
         await perform(Mutation(operationID: UUID().uuidString, action: "switch", expected: snapshot?.active?.expected, targetThreadID: thread.id))
