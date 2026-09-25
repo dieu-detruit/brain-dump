@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Dump · Watchプレビュー</title>
+<style>
+  :root { font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans', sans-serif; color: #24231f; background: #f3f0e8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  main { max-width: 1060px; margin: auto; padding: 64px 32px; display: grid; grid-template-columns: 1fr 380px; gap: 70px; align-items: center; min-height: 100svh; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: #817c72; }
+  h1 { font-size: clamp(32px, 4vw, 48px); line-height: 1.3; letter-spacing: -.04em; margin: 18px 0; }
+  .intro { line-height: 1.9; color: #777269; max-width: 430px; }
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; }
+  button:focus-visible, .screen:focus-visible { outline: 3px solid #e46945; outline-offset: 3px; }
+  .scenarios button, #reset, #remote { border: 1px solid #d8d3c7; background: transparent; border-radius: 24px; padding: 10px 15px; color: #24231f; }
+  .scenarios button[aria-pressed=true] { color: white; background: #24231f; border-color: #24231f; }
+  .options { margin: 24px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; font-size: 14px; }
+  input { accent-color: #24231f; }
+  #reset, #remote { font-size: 13px; padding: 7px 12px; }
+  .explanation { border-top: 1px solid #d8d3c7; padding-top: 20px; line-height: 1.8; font-size: 14px; min-height: 108px; }
+  .note { font-size: 12px; color: #817c72; line-height: 1.8; }
+  .device-area { text-align: center; }
+  .watch { position: relative; width: 292px; height: 352px; border-radius: 67px; background: linear-gradient(125deg,#777872,#262823 18%,#44473e 70%,#a0a297); padding: 12px; margin: 65px auto; box-shadow: 0 25px 50px #30392930, inset 0 0 0 2px #969990; }
+  .watch::before, .watch::after { content: ''; position: absolute; z-index: -1; width: 188px; height: 95px; background: #e46945; left: 52px; border-radius: 25px; }
+  .watch::before { top: -61px; } .watch::after { bottom: -61px; }
+  .crown { position: absolute; right: -9px; top: 92px; width: 12px; height: 40px; border-radius: 5px; background: repeating-linear-gradient(#66695e 0 2px,#42463d 2px 4px); }
+  .screen { color: #24231f; background: #f3f0e8; border: 4px solid #111; border-radius: 56px; height: 100%; overflow-y: auto; scrollbar-width: none; padding: 19px 16px 32px; text-align: left; font-size: 16px; }
+  .screen::-webkit-scrollbar { display: none; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #817c72; margin: 0 8px 15px; }
+  .topbar time { color: #24231f; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .app-title { font-size: 20px; font-weight: 650; margin: 0 4px 17px; }
+  .section-title { text-transform: none; font-size: 12px; color: #817c72; margin: 17px 8px 7px; }
+  .card { padding: 13px; border-radius: 18px; background: #fffdf8; line-height: 1.45; overflow-wrap: anywhere; margin-bottom: 4px; }
+  .screen button { display: block; width: 100%; border: 0; border-radius: 18px; padding: 13px; background: #fffdf8; color: #24231f; text-align: left; margin-bottom: 4px; line-height: 1.4; }
+  .screen button.primary { color: #fff; background: #e46945; }
+  .card.active { background: #24231f; color: #f8f5ee; }
+  .group-caption { font-size: 10px; color: #817c72; margin: 0 8px 7px; }
+  .screen button:disabled { color: #777; cursor: default; }
+  .screen button small { display: block; font-size: 11px; color: #817c72; margin-top: 5px; }
+  .screen .feedback { font-size: 13px; line-height: 1.5; margin: 12px 6px; }
+  .screen .error { color: #923e29; }
+  .screen .success { color: #e46945; }
+  .code { font-size: 28px; letter-spacing: .035em; font-variant-numeric: tabular-nums; margin: 10px 0; }
+  .notification-icon { width: 34px; height: 34px; background: #e46945; border-radius: 50%; display: grid; place-items: center; margin: 4px auto 10px; }
+  .notification-title { text-align: center; font-size: 13px; color: #817c72; margin: 0 0 18px; }
+  .prompt { font-size: 23px; font-weight: 650; line-height: 1.35; margin: 0 4px 10px; }
+  .screen .notification-body { margin: 8px 4px 18px; font-size: 14px; line-height: 1.6; color: #777269; }
+  .screen .center { text-align: center; }
+  .device-caption { margin-top: 85px; font-size: 12px; color: #817c72; line-height: 1.8; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; padding: 32px 22px; gap: 10px; } h1 { font-size: 32px; } .device-area { grid-row: 2; } .watch { margin-top: 80px; } .explanation { min-height: 0; } }
+  @media (prefers-reduced-motion: no-preference) { button { transition: background .15s; } }
+</style>
+<main>
+  <section>
+    <div class="eyebrow">Brain Dump / Apple Watch</div>
+    <h1>手元で確認。<br>そのまま、次の作業へ。</h1>
+    <p class="intro">作業の継続を伝える、既存のThreadへ切り替える。Watch版の操作を、ブラウザーで試せます。</p>
+    <nav class="scenarios" aria-label="プレビューする場面">
+      <button data-scene="home" aria-pressed="true">作業・切り替え</button>
+      <button data-scene="notification" aria-pressed="false">まだやっている？</button>
+      <button data-scene="pairing" aria-pressed="false">Webと接続（初回のみ）</button>
+    </nav>
+    <div class="options">
+      <label><input id="offline" type="checkbox"> 通信失敗を試す</label>
+      <button id="remote">Webでの切り替えを再現</button>
+      <button id="reset">最初に戻す</button>
+    </div>
+    <p class="explanation" id="explanation"></p>
+    <p class="note">ダミーデータだけを使う操作モックです。実際のデータは変更しません。<br>watchOSの実行画面ではなく、文字・余白・通知の見た目は実機と異なります。</p>
+  </section>
+  <section class="device-area" aria-label="Watchの操作プレビュー">
+    <div class="watch"><span class="crown" aria-hidden="true"></span><div class="screen" id="screen" tabindex="0" aria-label="Watch画面。スクロールできます"></div></div>
+    <p class="device-caption">時計の中をスクロールして操作できます。<br><span id="last-event" role="status" aria-live="polite">サンプルの作業を表示しています。</span></p>
+  </section>
+</main>
+<script>
+  const threads = [
+    { title: 'Watch版の使い心地を確認する', delegation: null },
+    { title: '週末の旅行を計画する', delegation: null },
+    { title: 'リリースノートをまとめる', delegation: 'ai' },
+    { title: 'デザインの返事を確認する', delegation: 'colleague' },
+  ];
+  const screen = document.querySelector('#screen');
+  const offline = document.querySelector('#offline');
+  const event = document.querySelector('#last-event');
+  let scene = 'home', active = 0, serverActive = 0, stale = false, message = '', error = false, busy = false, answered = false, pending;
+  const explanations = {
+    home: '表示中は15秒ごとに自動更新します。「待機中」はまだ誰にも渡していないThread、「進行中」はAI・他の人に任せているThreadです。Web版と同じ分類で、それぞれから切り替えられます。',
+    notification: '実際のアプリでは、最後の確認から55分後に通知の送信対象になります。「続けている」は通知から回答し、「切り替える」はアプリを開きます。ここではボタンで通知を再現しています。',
+    pairing: '新規アカウントの登録ではありません。初回だけ、WatchをいつものWebアカウントに接続する手順です。Web版の「Watch」で8桁のコードを入力します。このコードは見本です。',
+  };
+  function feedback() { return message ? `<p class="feedback ${error ? 'error' : 'success'}">${message}</p>` : ''; }
+  function render() {
+    document.querySelectorAll('[data-scene]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.scene === scene)));
+    document.querySelector('#explanation').textContent = explanations[scene];
+    let body = '';
+    if (scene === 'home') {
+      body = `<h2 class="app-title">Brain Dump</h2><p class="section-title">今やっている</p><div class="card active">${threads[active].title}</div><button class="primary" data-action="confirm" ${busy || stale ? 'disabled' : ''}>続けている</button>${stale ? '<p class="feedback error">未更新</p>' : ''}${feedback()}`;
+      for (const [group, caption, delegated] of [['待機中', 'まだ誰にも渡していない', false], ['進行中', 'AI・他の人に任せている', true]]) {
+        body += `<section data-group="${delegated ? 'delegated' : 'waiting'}"><p class="section-title">${group}</p><p class="group-caption">${caption}</p>`;
+        body += threads.map((thread, index) => ({thread, index})).filter(({thread}) => (thread.delegation !== null) === delegated).map(({thread, index}) => `<button data-thread="${index}" ${busy || stale || index === active ? 'disabled' : ''}>${thread.title}${index === active ? '<small>今やっている</small>' : thread.delegation ? `<small>${thread.delegation === 'ai' ? 'AI' : '他の人'}</small>` : ''}</button>`).join('');
+        body += '</section>';
+      }
+      if (error) body += `<button data-action="refresh" class="center" ${busy ? 'disabled' : ''}>再試行</button>`;
+      if (busy) body += '<p class="feedback">通信中…</p>';
+    } else if (scene === 'notification') {
+      body = `<div class="notification-icon" aria-hidden="true">✓</div><p class="notification-title">Brain Dump</p><h2 class="prompt">まだやっている？</h2><p class="notification-body">${threads[active].title}</p><button class="primary center" data-action="notification-confirm" ${busy || answered ? 'disabled' : ''}>${busy ? '回答中…' : answered ? '回答済み（デモ）' : '続けている'}</button><button class="center" data-action="open" ${busy ? 'disabled' : ''}>切り替える</button>${feedback()}`;
+    } else {
+      body = '<h2 class="app-title">Brain Dump</h2><p class="section-title">Webと接続</p><div class="card">初回だけ、Web版の「Watch」でこのコードを入力します。いつものアカウントに接続します。<div class="code">12345678</div><small>見本のコード · 実際は5分間有効</small></div><button data-action="paired" class="primary center">接続後を見る（デモ）</button>';
+    }
+    screen.innerHTML = '<div class="topbar"><span>プレビュー</span><time>10:09</time></div>' + body;
+  }
+  function selectScene(next) {
+    clearTimeout(pending); busy = false; scene = next; message = ''; error = false; answered = false;
+    render(); screen.scrollTop = 0;
+  }
+  function request(kind, target) {
+    busy = true; message = ''; error = false;
+    const failed = offline.checked;
+    render();
+    pending = setTimeout(() => {
+      busy = false;
+      if (failed) {
+        error = true;
+        message = kind === 'notification-confirm' ? '回答を保存できませんでした。アプリで状態を確認してください。' : '接続できませんでした。状態を更新してからお試しください。';
+        if (scene === 'home') stale = true;
+      } else {
+        stale = false;
+        if (kind === 'switch') serverActive = target;
+        active = serverActive;
+        message = kind === 'switch' ? '切り替えました' : kind === 'refresh' ? '最新の状態に更新しました' : '確認しました';
+        if (kind === 'notification-confirm') answered = true;
+      }
+      event.textContent = failed ? '通信失敗。作業と確認時刻は変更していません。' : kind === 'switch' ? `「${threads[active].title}」へ切り替えました。` : kind === 'refresh' ? '最新の状態を取得しました。' : '継続の回答を受け付けました（デモ）。';
+      render(); screen.scrollTop = 0;
+    }, 500);
+  }
+  document.querySelectorAll('[data-scene]').forEach(button => button.addEventListener('click', () => selectScene(button.dataset.scene)));
+  screen.addEventListener('click', e => {
+    const button = e.target.closest('button');
+    if (!button || button.disabled || busy) return;
+    if (button.dataset.thread !== undefined) request('switch', Number(button.dataset.thread));
+    else if (['open', 'paired'].includes(button.dataset.action)) selectScene('home');
+    else request(button.dataset.action);
+  });
+  document.querySelector('#reset').addEventListener('click', () => {
+    active = 0; serverActive = 0; stale = false; offline.checked = false; event.textContent = 'サンプルの作業を表示しています。'; selectScene('home');
+  });
+  document.querySelector('#remote').addEventListener('click', () => {
+    serverActive = (serverActive + 1) % threads.length;
+    event.textContent = `Web側で「${threads[serverActive].title}」へ切り替えました。15秒以内に自動反映します。`;
+  });
+  setInterval(() => {
+    if (scene !== 'home' || busy || document.hidden) return;
+    if (offline.checked) {
+      stale = true; error = true; message = '接続できませんでした。自動で再試行します。';
+    } else {
+      const changed = active !== serverActive;
+      active = serverActive;
+      if (changed) event.textContent = `Web側の変更を自動反映しました：「${threads[active].title}」`;
+      if (error) { message = ''; error = false; }
+      stale = false;
+    }
+    const top = screen.scrollTop;
+    render(); screen.scrollTop = top;
+  }, 15000);
+  render();
+</script>
+</html>

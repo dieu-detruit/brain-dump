@@ -127,3 +127,11 @@ Appleの証明書を必要としないシミュレーター用ad hoc署名へ変
 1. [Apple Developer Program](https://developer.apple.com/jp/programs/enroll/)へ個人として登録する。年99米ドル、現地通貨の請求額は登録画面で確認する。本人確認と支払いは本人が行う。
 2. 登録完了後にアプリID・署名・APNsキーの設定を進める。最初のビルド検証用のCodemagic登録は不要。
 3. サーバー配置と署名ビルドが済んだら、TestFlightで導入して上記の実機受け入れ試験を行う。
+
+## 画面の修正（2026-09-25）
+
+Webと同じdelegation基準で「待機中」「進行中」を分け、各分類内を優先順に表示する。
+画面表示中の15秒ごとの自動更新は維持し、通常の更新ボタンは削除。通信エラー時だけ「再試行」を出す。
+生成り・濃い文字色・オレンジをWebと共通にし、初回の端末紐づけは「Webと接続」と表記する。
+[検証結果](https://github.com/dieu-detruit/brain-dump/actions/runs/36097891287): Xcodeのテストと未署名archiveが成功。
+ブラウザー操作モックは `docs/previews/watch.html`。分類・継続回答・切り替え・通信失敗・自動更新をブラウザーで確認済み。
