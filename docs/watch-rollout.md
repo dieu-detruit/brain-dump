@@ -6,7 +6,7 @@
 - DenoのAPI・APNs署名/応答テスト: 実行可能。
 - PostgreSQL 17で既存migrationからの追加と操作・認証・通知テスト: 実行可能。
 - Supabaseの実際のAuthゲートウェイ・Vault・Cron・Edge runtime: 未デプロイ。
-- Swift/Xcodeのコンパイル・XCTest・watch-only archive/export: 未実行。
+- Swift/Xcodeのコンパイル・XCTest（8件）・未署名watch-only archive: GitHub Actionsで成功。署名付きexportは未実行。
 - TestFlight導入・実機通知・バックグラウンド回答: 未実行。
 
 ## ローカル検証
@@ -33,7 +33,7 @@ Dockerアクセスが必要です。既存DB・本番DBには接続しません�
    API自身が経路ごとに認証する。Cron用関数は専用Bearer secretを検証する。
 4. APNsの本番設定前に、Edge runtimeからAPNsへのHTTP/2疎通を検証する。
    `scripts/check-apns-transport.ts` は非認証の拒否応答を確認する検証用コード。アプリ配送の証拠にはしない。
-5. Webを更新し、Watchの未署名CIを実行する。
+5. Webを更新し、Watchの証明書不要CIを実行する。
 6. Apple登録と署名設定を済ませてTestFlightから導入する。
 7. Webで紐づけ、Watchの通知許可・token登録を確認する。
 8. Edge SecretsとVault設定後、`supabase/scripts/enable-watch-cron.sql` をSQL Editorで適用する。
@@ -108,3 +108,22 @@ YAML/JSON/entitlementsの構文読み込みとshell syntaxチェックも成功�
 追加の疎通確認: ローカルDenoからAPNs sandboxへ接続し、`403 MissingProviderToken` を受信。
 ネットワーク制限を外した検証でAPNsまで到達したことは確認できました。
 認証・配送の成功ではなく、SupabaseのEdge runtimeからの疎通確認も別途必要です。
+
+## Mac環境での確認結果（2026-09-25）
+
+[GitHub Actionsの実行](https://github.com/dieu-detruit/brain-dump/actions/runs/36075053474)で、
+Xcode 26.3 / XcodeGen 2.46.0によるWatchアプリのコンパイルとXCTest 8件が成功。
+Keychain実保存、古い401応答からの保護、紐づけ復帰、通知登録再試行、通信失敗、通知payloadを検証。
+最初の実行では署名を完全に無効化してKeychainテストが失敗したため、
+Appleの証明書を必要としないシミュレーター用ad hoc署名へ変更して再検証した。
+これは実機の署名、APNs配送、バックグラウンド実行の確認を含まない。
+
+[配布構成を含む最終実行](https://github.com/dieu-detruit/brain-dump/actions/runs/36075441723)でもXCTest 8件が成功。
+`BrainDumpContainer` の未署名iOS archive生成に成功し、生成物の `Watch/BrainDumpWatch.app` と実行ファイルの存在を確認。
+配布コンテナの画面方向・起動画面についてXcode警告が残るため、実際の署名exportとApp Store Connectの検証時に確認する。
+
+## 利用者が次に行うこと
+
+1. [Apple Developer Program](https://developer.apple.com/jp/programs/enroll/)へ個人として登録する。年99米ドル、現地通貨の請求額は登録画面で確認する。本人確認と支払いは本人が行う。
+2. 登録完了後にアプリID・署名・APNsキーの設定を進める。最初のビルド検証用のCodemagic登録は不要。
+3. サーバー配置と署名ビルドが済んだら、TestFlightで導入して上記の実機受け入れ試験を行う。

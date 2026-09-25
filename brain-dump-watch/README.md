@@ -5,9 +5,9 @@ Web版の「Watch」から一度登録すると、Watch単独でAPIに接続で�
 
 ## 現在の検証範囲
 
-Linux側でWeb・Edgeのテスト、独立PostgreSQLでDB動作を検証します。
-Swift/Xcodeのビルド、Codemagicの実行、署名・TestFlight導入、実機での通知配送は別途確認が必要です。
-ソースが存在することと実機動作の確認は別です。実施結果は `../docs/watch-rollout.md` を参照してください。
+Web・Edge・独立PostgreSQLでのDBテストに加え、GitHub ActionsのXcode 26.3でWatchアプリのビルドとXCTest 8件が成功しています。
+署名・TestFlight導入・実機での通知配送は別途確認が必要です。
+実施結果は `../docs/watch-rollout.md` を参照してください。
 
 ## Macなし・Apple登録なしでビルド
 
@@ -22,7 +22,7 @@ Codemagicを使う場合はリポジトリを接続し、ルートの `codemagic
 初期設定はXcode 26.3 / M2です。
 
 シミュレーター端末はインストール済みのwatchOS runtimeから選びます。
-XcodeGenはCIでインストールするため、初回は使用バージョンをログで確認し、成功した版を固定してください。
+XcodeGenはCIでインストールします。検証済みバージョンは2.46.0です。
 
 Macが利用可能なら、リポジトリルートで `bash brain-dump-watch/scripts/test.sh` を実行できます。
 
