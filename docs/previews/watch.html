@@ -34,6 +34,20 @@
   .section-title { text-transform: none; font-size: 12px; color: #817c72; margin: 17px 8px 7px; }
   .card { padding: 13px; border-radius: 18px; background: #fffdf8; line-height: 1.45; overflow-wrap: anywhere; margin-bottom: 4px; }
   .screen button { display: block; width: 100%; border: 0; border-radius: 18px; padding: 13px; background: #fffdf8; color: #24231f; text-align: left; margin-bottom: 4px; line-height: 1.4; }
+  .screen button.thread { display:flex; align-items:center; gap:8px; min-height:48px; padding:10px; font-size:14px; }
+  .screen button.thread .title { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .screen button.thread.active { background:#24231f; color:#f8f5ee; }
+  .execution-mark { width:17px; height:17px; border:1.5px solid #aaa499; border-radius:50%; position:relative; flex:0 0 auto; }
+  .execution-mark::after { content:''; width:5px; height:5px; background:#aaa499; border-radius:50%; position:absolute; top:4.5px; left:4.5px; }
+  .active .execution-mark { border-color:#e46945; }
+  .active .execution-mark::after { background:#e46945; }
+  .delegation-icon { width:24px; height:26px; flex:0 0 auto; display:grid; place-items:center; color:#817c72; border-radius:6px; }
+  .delegation-icon.ai { color:#526d7b; background:#e1e9eb; }
+  .delegation-icon.colleague { color:#655f4e; background:#e7e3d6; }
+  .active .delegation-icon { background:#403f3a; color:#f0b39f; }
+  .legend { display:flex; flex-wrap:wrap; gap:15px; font-size:12px; color:#777269; margin-top:18px; }
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .legend svg { width:18px; height:18px; }
   .screen button.primary { color: #fff; background: #e46945; }
   .card.active { background: #24231f; color: #f8f5ee; }
   .group-caption { font-size: 10px; color: #817c72; margin: 0 8px 7px; }
@@ -67,7 +81,7 @@
       <button id="remote">Webでの切り替えを再現</button>
       <button id="reset">最初に戻す</button>
     </div>
-    <p class="explanation" id="explanation"></p>
+    <p class="explanation" id="explanation"></p><div class="legend" id="legend" aria-label="マークの意味"></div>
     <p class="note">ダミーデータだけを使う操作モックです。実際のデータは変更しません。<br>watchOSの実行画面ではなく、文字・余白・通知の見た目は実機と異なります。</p>
   </section>
   <section class="device-area" aria-label="Watchの操作プレビュー">
@@ -85,22 +99,31 @@
   const screen = document.querySelector('#screen');
   const offline = document.querySelector('#offline');
   const event = document.querySelector('#last-event');
-  let scene = 'home', active = 0, serverActive = 0, stale = false, message = '', error = false, busy = false, answered = false, pending;
+  let scene = 'home', active = 0, serverActive = 0, stale = false, message = '', error = false, busy = false, answered = false, confirmationDue = false, pending;
   const explanations = {
-    home: '表示中は15秒ごとに自動更新します。「待機中」はまだ誰にも渡していないThread、「進行中」はAI・他の人に任せているThreadです。Web版と同じ分類で、それぞれから切り替えられます。',
+    home: 'オレンジのマークが実行中です。実行中のThreadをもう一度タップすると継続を確認し、別のThreadをタップすると切り替えます。委任先のアイコンは、実行中でも残ります。表示中は15秒ごとに自動更新します。',
     notification: '実際のアプリでは、最後の確認から55分後に通知の送信対象になります。「続けている」は通知から回答し、「切り替える」はアプリを開きます。ここではボタンで通知を再現しています。',
     pairing: '新規アカウントの登録ではありません。初回だけ、WatchをいつものWebアカウントに接続する手順です。Web版の「Watch」で8桁のコードを入力します。このコードは見本です。',
   };
+  function delegationLabel(value) { return value === 'ai' ? 'Agentに委任' : value === 'colleague' ? '他の人に委任' : '待機中'; }
+  function icon(value) {
+    const shape = value === 'ai'
+      ? '<path d="M12 8V4H8M2 12v4M22 12v4M9 13v2M15 13v2"/><rect x="4" y="8" width="16" height="12" rx="2"/>'
+      : value === 'colleague' ? '<circle cx="12" cy="8" r="4"/><path d="M20 21v-2a7 7 0 0 0-14 0v2"/>'
+      : '<path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>';
+    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${shape}</svg>`;
+  }
+  document.querySelector('#legend').innerHTML = `<span><b style="color:#e46945">●</b> 実行中</span><span>${icon('ai')} Agentに委任</span><span>${icon('colleague')} 他の人に委任</span><span>${icon(null)} 待機中</span>`;
   function feedback() { return message ? `<p class="feedback ${error ? 'error' : 'success'}">${message}</p>` : ''; }
   function render() {
     document.querySelectorAll('[data-scene]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.scene === scene)));
     document.querySelector('#explanation').textContent = explanations[scene];
     let body = '';
     if (scene === 'home') {
-      body = `<h2 class="app-title">Brain Dump</h2><p class="section-title">今やっている</p><div class="card active">${threads[active].title}</div><button class="primary" data-action="confirm" ${busy || stale ? 'disabled' : ''}>続けている</button>${stale ? '<p class="feedback error">未更新</p>' : ''}${feedback()}`;
-      for (const [group, caption, delegated] of [['待機中', 'まだ誰にも渡していない', false], ['進行中', 'AI・他の人に任せている', true]]) {
-        body += `<section data-group="${delegated ? 'delegated' : 'waiting'}"><p class="section-title">${group}</p><p class="group-caption">${caption}</p>`;
-        body += threads.map((thread, index) => ({thread, index})).filter(({thread}) => (thread.delegation !== null) === delegated).map(({thread, index}) => `<button data-thread="${index}" ${busy || stale || index === active ? 'disabled' : ''}>${thread.title}${index === active ? '<small>今やっている</small>' : thread.delegation ? `<small>${thread.delegation === 'ai' ? 'AI' : '他の人'}</small>` : ''}</button>`).join('');
+      body = `<h2 class="app-title">Brain Dump</h2>${confirmationDue ? '<p class="feedback">まだやっている？ 実行中の作業をタップして確認してください。</p>' : ''}${stale ? '<p class="feedback error">未更新</p>' : ''}${feedback()}`;
+      for (const [group, delegated] of [['待機中', false], ['進行中', true]]) {
+        body += `<section data-group="${delegated ? 'delegated' : 'waiting'}"><p class="section-title">${group}</p>`;
+        body += threads.map((thread, index) => ({thread, index})).filter(({thread}) => (thread.delegation !== null) === delegated).map(({thread, index}) => `<button class="thread ${index === active ? 'active' : ''}" data-thread="${index}" aria-label="${thread.title}、${delegationLabel(thread.delegation)}、${index === active ? '実行中。タップで継続確認' : 'タップで切り替え'}" ${busy || stale ? 'disabled' : ''}><span class="execution-mark" aria-hidden="true"></span><span class="title">${thread.title}</span><span class="delegation-icon ${thread.delegation ?? 'sleep'}" aria-hidden="true">${icon(thread.delegation)}</span></button>`).join('');
         body += '</section>';
       }
       if (error) body += `<button data-action="refresh" class="center" ${busy ? 'disabled' : ''}>再試行</button>`;
@@ -113,7 +136,8 @@
     screen.innerHTML = '<div class="topbar"><span>プレビュー</span><time>10:09</time></div>' + body;
   }
   function selectScene(next) {
-    clearTimeout(pending); busy = false; scene = next; message = ''; error = false; answered = false;
+    clearTimeout(pending); busy = false; scene = next;
+    if (next === 'notification') confirmationDue = true; message = ''; error = false; answered = false;
     render(); screen.scrollTop = 0;
   }
   function request(kind, target) {
@@ -129,6 +153,7 @@
       } else {
         stale = false;
         if (kind === 'switch') serverActive = target;
+        if (['switch', 'confirm', 'notification-confirm'].includes(kind)) confirmationDue = false;
         active = serverActive;
         message = kind === 'switch' ? '切り替えました' : kind === 'refresh' ? '最新の状態に更新しました' : '確認しました';
         if (kind === 'notification-confirm') answered = true;
@@ -141,12 +166,15 @@
   screen.addEventListener('click', e => {
     const button = e.target.closest('button');
     if (!button || button.disabled || busy) return;
-    if (button.dataset.thread !== undefined) request('switch', Number(button.dataset.thread));
+    if (button.dataset.thread !== undefined) {
+      const target = Number(button.dataset.thread);
+      request(target === active ? 'confirm' : 'switch', target);
+    }
     else if (['open', 'paired'].includes(button.dataset.action)) selectScene('home');
     else request(button.dataset.action);
   });
   document.querySelector('#reset').addEventListener('click', () => {
-    active = 0; serverActive = 0; stale = false; offline.checked = false; event.textContent = 'サンプルの作業を表示しています。'; selectScene('home');
+    active = 0; serverActive = 0; confirmationDue = false; stale = false; offline.checked = false; event.textContent = 'サンプルの作業を表示しています。'; selectScene('home');
   });
   document.querySelector('#remote').addEventListener('click', () => {
     serverActive = (serverActive + 1) % threads.length;
@@ -159,6 +187,7 @@
     } else {
       const changed = active !== serverActive;
       active = serverActive;
+      if (changed) confirmationDue = false;
       if (changed) event.textContent = `Web側の変更を自動反映しました：「${threads[active].title}」`;
       if (error) { message = ''; error = false; }
       stale = false;
