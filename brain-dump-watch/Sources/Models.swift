@@ -28,6 +28,8 @@ struct Snapshot: Codable {
     let serverTime: String
     let threads: [BrainThread]
     let active: ActiveExecution?
+    var waitingThreads: [BrainThread] { threads.filter { $0.delegation == nil }.sorted { $0.priority < $1.priority } }
+    var delegatedThreads: [BrainThread] { threads.filter { $0.delegation != nil }.sorted { $0.priority < $1.priority } }
     enum CodingKeys: String, CodingKey { case serverTime = "server_time", threads, active }
 }
 struct Mutation: Encodable {
