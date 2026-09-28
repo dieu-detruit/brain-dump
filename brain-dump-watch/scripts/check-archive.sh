@@ -10,3 +10,12 @@ xcodebuild archive -project brain-dump-watch/BrainDumpWatch.xcodeproj -scheme Br
   APNS_ENVIRONMENT=production CODE_SIGNING_ALLOWED=NO DEVELOPMENT_TEAM=
 test -d /tmp/BrainDumpWatch-unsigned.xcarchive/Products/Applications/BrainDumpContainer.app/Watch/BrainDumpWatch.app
 test -f /tmp/BrainDumpWatch-unsigned.xcarchive/Products/Applications/BrainDumpContainer.app/Watch/BrainDumpWatch.app/BrainDumpWatch
+python3 - <<'PY'
+import pathlib
+import plistlib
+
+container = pathlib.Path('/tmp/BrainDumpWatch-unsigned.xcarchive/Products/Applications/BrainDumpContainer.app')
+with (container / 'Info.plist').open('rb') as file:
+    info = plistlib.load(file)
+assert info.get('CFBundlePackageType') == 'APPL', 'App Store requires an APPL distribution container'
+PY

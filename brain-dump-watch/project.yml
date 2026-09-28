@@ -53,6 +53,7 @@ targets:
         CFBundleDisplayName: Brain Dump
         ITSWatchOnlyContainer: true
         LSApplicationLaunchProhibited: true
+        CFBundlePackageType: APPL
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
