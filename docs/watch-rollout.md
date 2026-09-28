@@ -11,7 +11,8 @@ Watchへ個人のログイン情報・管理者キーを埋め込まない。API
 全6 SQLスイートと競合テストを再実行済み。ホストされたAuthゲートウェイ経由の検証は配置後に行う。
 
 Apple Team IDは `XLVLA9AY6A`。GitHubの同名変数に保存済み。実機はApple Watch SE 3 / watchOS 26.5。
-App ID・配布署名・App Store Connect連携・APNs鍵は未設定。
+親App ID `com.takafumi.brain-dump` は利用者が作成済み。Watch子ID・配布署名・App Store Connect連携・APNs鍵は未確認。
+GitHub署名ビルドと[利用者向け設定手順](watch-testflight-setup.md)を追加。Appleキー設定後に専用タグで起動する。
 Supabase CLIログインを確認し、既存プロジェクト `zxiezbwnmqxccfvzarnj` へ接続済み。
 DBのdry runで未適用は20260924の3本のみと確認し、変更前publicスキーマを権限制限したローカル一時ディレクトリへ退避した。
 Vercelで本番環境の更新版をビルドし、3本のmigration適用後に本番URLを更新版へ切り替えた。
@@ -157,9 +158,9 @@ Appleの証明書を必要としないシミュレーター用ad hoc署名へ変
 
 ## 利用者が次に行うこと
 
-1. [Apple Developer Program](https://developer.apple.com/jp/programs/enroll/)へ個人として登録する。年99米ドル、現地通貨の請求額は登録画面で確認する。本人確認と支払いは本人が行う。
-2. 登録完了後にアプリID・署名・APNsキーの設定を進める。最初のビルド検証用のCodemagic登録は不要。
-3. サーバー配置と署名ビルドが済んだら、TestFlightで導入して上記の実機受け入れ試験を行う。
+1. 加入は完了済み。[設定手順](watch-testflight-setup.md)に従ってWatch子ID、App Store Connectアプリ、APIキーを登録する。
+2. 通知用APNsキーをSupabaseへ保存する。Codemagicサービスへの登録は不要。
+3. 署名ビルド後にTestFlightで導入して上記の実機受け入れ試験を行う。
 
 ## 画面の修正（2026-09-25）
 
