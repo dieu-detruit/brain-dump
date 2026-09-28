@@ -13,11 +13,25 @@ Watchへ個人のログイン情報・管理者キーを埋め込まない。API
 Apple Team IDは `XLVLA9AY6A`。GitHubの同名変数に保存済み。実機はApple Watch SE 3 / watchOS 26.5。
 App ID・配布署名・App Store Connect連携・APNs鍵は未設定。
 Supabase CLIログインを確認し、既存プロジェクト `zxiezbwnmqxccfvzarnj` へ接続済み。
-DBのdry runで未適用は20260924の3本のみと確認。旧確認RPCを置き換えるため、Web配置先を確認して更新を揃えるまでDB反映を保留する。
+DBのdry runで未適用は20260924の3本のみと確認し、変更前publicスキーマを権限制限したローカル一時ディレクトリへ退避した。
+Vercelで本番環境の更新版をビルドし、3本のmigration適用後に本番URLを更新版へ切り替えた。
 `watch-api` / `watch-notifications` は既存プロジェクトへ配置済み（いずれもversion 1 / ACTIVE）。
 実ゲートウェイ経由で、未認証のstate・devices取得と通知送信が401、不正な紐づけ要求が400になることを確認。
-DB未反映のため、正しいコードによる接続・操作の実環境試験は未実行。鍵・Cron未設定で通知は未開始。
+実ゲートウェイ→DB経由のコード発行、正しい秘密値でのpending照会、誤った秘密値・未承認端末の401拒否を確認。
+検証用の未承認コードを1件作成（コードは5分で期限切れ）。実ユーザーへの紐づけやThread操作は行っていない。
+Googleログインしたユーザーによる接続承認と実機操作は未検証。鍵・Cron未設定で通知は未開始。
 署名済みIPA作成、TestFlightアップロードは未実行。
+
+### 本番Webの切り替え記録
+
+- 公開URL: https://brain-dump-one-phi.vercel.app/
+- Vercel project: `prj_wRbwVxIrQkdvp6AlHX3Lq0126kH1`、root directory: `brain-dump`
+- 変更前: `dpl_CygJWegXJct8TgRrYLBMpcG2R5tK`
+- 更新版: `dpl_9hGmifGNxrLHE3Cog4bDd9EpT3Tx`（本番設定でbuild後にpromote）
+- 公開JS: `/assets/index-CznD9-33.js`。Watch接続画面・新実行RPC・既存Supabaseの参照を確認。
+- 元ソース: `9e009cd`。`feat/watch-app` の内容を配置し、mainにはまだmergeしていない。
+- 今後mainから再配置する前にWatch対応を統合すること。旧Webだけへ戻すと旧確認RPCが再読み込みを要求する。
+- 開いたままの旧Web/PWAは再読み込みが必要。
 
 ## 実行済みと未実行
 
