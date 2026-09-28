@@ -29,6 +29,7 @@ protocol WatchAPI {
     func startPairing(_ credentials: WatchCredentials) async throws -> PairingReply
     func pairingStatus(_ credentials: WatchCredentials) async throws -> PairingStatus
     func registerPush(_ pushToken: String, token: String) async throws
+    func applyThread(_ command: ThreadMutation, token: String) async throws -> MutationResult
 }
 
 final class APIClient: WatchAPI {
@@ -56,6 +57,9 @@ final class APIClient: WatchAPI {
     func snapshot(token: String) async throws -> Snapshot { try await request("state", token: token) }
     func apply(_ command: Mutation, token: String) async throws -> MutationResult {
         try await request("execution", method: "POST", token: token, data: JSONEncoder().encode(command), conflict: true)
+    }
+    func applyThread(_ command: ThreadMutation, token: String) async throws -> MutationResult {
+        try await request("thread", method: "POST", token: token, data: JSONEncoder().encode(command), conflict: true)
     }
     func startPairing(_ credentials: WatchCredentials) async throws -> PairingReply {
         try await request("pairings", method: "POST", data: JSONEncoder().encode([

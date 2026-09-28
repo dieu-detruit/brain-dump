@@ -1,6 +1,24 @@
 import XCTest
 @testable import BrainDumpWatch
 @MainActor final class ExecutionModelTests: XCTestCase {
+    func testThreadChangeOnlyClosesAfterAppliedAndPreservesFailure() async {
+        let api = FakeAPI()
+        let model = ExecutionModel(api: api, store: MemoryStore(WatchCredentials(pairingSecret: "s", deviceToken: "t", deviceID: "d")), requestNotifications: { false })
+        await model.refresh()
+        let before = model.snapshot!
+        api.threadResult = MutationResult(status: "stale", snapshot: before)
+        let stale = await model.changeThread(before.threads[0], action: "complete", expected: before.active?.expected)
+        XCTAssertFalse(stale)
+        XCTAssertNotNil(model.errorMessage)
+        await model.refresh()
+        api.threadResult = MutationResult(status: "applied", snapshot: Snapshot(serverTime: before.serverTime, threads: [], active: nil))
+        let applied = await model.changeThread(before.threads[0], action: "complete", expected: before.active?.expected)
+        XCTAssertTrue(applied)
+        XCTAssertEqual(model.snapshot?.threads.count, 0)
+        XCTAssertFalse(model.isSending)
+        XCTAssertEqual(api.threadCommands.last?.expected, before.active?.expected)
+        XCTAssertEqual(api.threadCommands.last?.action, "complete")
+    }
     func testTappingCurrentThreadConfirmsAndOtherThreadSwitches() async {
         let api = FakeAPI()
         let model = ExecutionModel(api: api, store: MemoryStore(WatchCredentials(pairingSecret: "s", deviceToken: "t", deviceID: "d")), requestNotifications: { false })
@@ -54,6 +72,8 @@ private final class MemoryStore: CredentialStorage {
 }
 private final class FakeAPI: WatchAPI {
     var commands: [Mutation] = []
+    var threadCommands: [ThreadMutation] = []
+    var threadResult: MutationResult?
     func snapshot(token: String) async throws -> Snapshot {
         Snapshot(serverTime: "2026-09-24T00:00:00Z", threads: [BrainThread(id: "t", title: "作業", delegation: nil, priority: 1)], active: ActiveExecution(sessionID: "1", confirmationRevision: "r", threadID: "t", lastConfirmedAt: "2026-09-24T00:00:00Z", deadline: "2026-09-24T01:00:00Z"))
     }
@@ -61,4 +81,9 @@ private final class FakeAPI: WatchAPI {
     func startPairing(_ credentials: WatchCredentials) async throws -> PairingReply { throw APIError.unavailable }
     func pairingStatus(_ credentials: WatchCredentials) async throws -> PairingStatus { PairingStatus(status: "approved", deviceID: "approved-device") }
     func registerPush(_ pushToken: String, token: String) async throws {}
+    func applyThread(_ command: ThreadMutation, token: String) async throws -> MutationResult {
+        threadCommands.append(command)
+        if let threadResult { return threadResult }
+        throw APIError.unavailable
+    }
 }

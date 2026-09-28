@@ -1,4 +1,4 @@
-import { parseMutation, uuid } from "../_shared/contracts.ts";
+import { parseMutation, parseThreadMutation, uuid } from "../_shared/contracts.ts";
 import { body, hash, json, type RPC } from "../_shared/http.ts";
 const hex = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{64}$/.test(v);
 export function createHandler(deps: { rpc: RPC; user: (token: string) => Promise<string | null> }) {
@@ -56,10 +56,15 @@ export function createHandler(deps: { rpc: RPC; user: (token: string) => Promise
             owner,
           });
         } else return json({ error: "invalid_request" }, 400);
-      } else if (["GET /state", "POST /execution", "PUT /push-token"].includes(`${request.method} ${path}`)) {
+      } else if (
+        ["GET /state", "POST /execution", "POST /thread", "PUT /push-token"].includes(
+          `${request.method} ${path}`,
+        )
+      ) {
         if (!hex(bearer)) return json({ error: "unauthorized" }, 401);
         let args: Record<string, unknown> = {};
         if (path === "/execution") args = parseMutation(await body(request));
+        if (path === "/thread") args = parseThreadMutation(await body(request));
         if (path === "/push-token") {
           const b = await body(request);
           if (

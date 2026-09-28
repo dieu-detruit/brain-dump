@@ -59,3 +59,26 @@ struct Mutation: Encodable {
     }
 }
 struct MutationResult: Decodable { let status: String; let snapshot: Snapshot }
+
+struct ThreadMutation: Encodable {
+    let operationID: String
+    let action: String
+    let thread: BrainThread
+    let expected: ExpectedExecution?
+    let delegation: String?
+    enum CodingKeys: String, CodingKey {
+        case operationID = "operation_id", action, threadID = "thread_id", expected
+        case expectedThread = "expected_thread", delegation, title
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(operationID, forKey: .operationID)
+        try c.encode(action, forKey: .action)
+        try c.encode(thread.id, forKey: .threadID)
+        try c.encode(expected, forKey: .expected)
+        var previous = c.nestedContainer(keyedBy: CodingKeys.self, forKey: .expectedThread)
+        try previous.encode(thread.title, forKey: .title)
+        try previous.encode(thread.delegation, forKey: .delegation)
+        if action == "delegate" { try c.encode(delegation, forKey: .delegation) }
+    }
+}

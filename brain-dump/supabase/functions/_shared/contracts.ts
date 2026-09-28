@@ -41,3 +41,29 @@ export function parseMutation(value: unknown): Mutation {
     ...(v.action === "switch" ? { target_thread_id: v.target_thread_id as string | null } : {}),
   };
 }
+
+export function parseThreadMutation(value: Record<string, unknown>): Record<string, unknown> {
+  const v = value;
+  const thread = v.expected_thread as Record<string, unknown> | undefined;
+  const delegation = (x: unknown) => x === null || x === "ai" || x === "colleague";
+  if (
+    !uuid(v.operation_id) || !uuid(v.thread_id) || !["complete", "delegate"].includes(String(v.action)) ||
+    !thread || typeof thread.title !== "string" || !delegation(thread.delegation) ||
+    (v.action === "delegate" && !delegation(v.delegation))
+  ) throw new Error("invalid_request");
+  // Reuse execution-revision validation, including explicit idle (null).
+  const { expected } = parseMutation({
+    action: "switch",
+    operation_id: v.operation_id,
+    expected: v.expected,
+    target_thread_id: null,
+  });
+  return {
+    operation_id: v.operation_id,
+    action: v.action,
+    thread_id: v.thread_id,
+    expected,
+    expected_thread: { title: thread.title, delegation: thread.delegation },
+    ...(v.action === "delegate" ? { delegation: v.delegation } : {}),
+  };
+}

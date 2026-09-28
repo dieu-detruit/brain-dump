@@ -64,3 +64,40 @@ Deno.test("rate limit and stale results keep their HTTP meanings", async () => {
     assert(r.status === status);
   }
 });
+
+Deno.test("thread operations validate payloads and never trust a client owner", async () => {
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const command = {
+    operation_id: id,
+    action: "delegate",
+    thread_id: id,
+    expected: null,
+    expected_thread: { title: "作業", delegation: null },
+    delegation: "ai",
+    owner: "attacker",
+  };
+  const request = (body: unknown, token = "a".repeat(64)) =>
+    new Request("https://x/watch-api/thread", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token },
+      body: JSON.stringify(body),
+    });
+  const r = await handler(request(command));
+  assert(r.status === 200);
+  const result = await r.json();
+  assert(result.args.action === "thread" && result.args.args.delegation === "ai");
+  assert(result.args.args.owner === undefined && result.args.token_hash !== "a".repeat(64));
+  assert((await handler(request(command, ""))).status === 401);
+  for (
+    const invalid of [
+      { ...command, delegation: "anyone" },
+      { ...command, action: "delete" },
+      { ...command, thread_id: "bad" },
+      { ...command, expected: undefined },
+      { ...command, expected_thread: { title: "作業" } },
+    ]
+  ) {
+    assert((await handler(request(invalid))).status === 400);
+  }
+  assert((await handler(request({ ...command, action: "complete" }))).status === 200);
+});

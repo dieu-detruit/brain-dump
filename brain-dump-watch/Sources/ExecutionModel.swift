@@ -106,6 +106,23 @@ final class ExecutionModel: ObservableObject {
             lastNotificationAttempt = .distantPast
         }
     }
+    func changeThread(_ thread: BrainThread, action: String, delegation: String? = nil, expected: ExpectedExecution?) async -> Bool {
+        guard !isSending && !isStale, let token = credentials?.deviceToken else { return false }
+        isSending = true
+        generation += 1
+        errorMessage = nil
+        defer { isSending = false }
+        do {
+            let result = try await api.applyThread(ThreadMutation(operationID: UUID().uuidString, action: action, thread: thread, expected: expected, delegation: delegation), token: token)
+            snapshot = result.snapshot
+            guard result.status == "applied" else {
+                errorMessage = "状態が変わりました。閉じて選び直してください。"
+                isStale = true
+                return false
+            }
+            return true
+        } catch { failure(error); return false }
+    }
     func enableNotifications() async {
         guard credentials?.deviceID != nil else { return }
         lastNotificationAttempt = Date()
