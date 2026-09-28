@@ -107,5 +107,10 @@ Appleの処理が完了したら内部テストへ追加する。
 - [Apple: TestFlightインストール（watchOSの節）](https://testflight.apple.com/)
 - [Codemagic CLIを他環境で使用](https://docs.codemagic.io/knowledge-codemagic/codemagic-cli-tools/)
 
-2026-09-28時点: CLI引数・workflow構文の検証まで。Appleキー未設定のため署名・アップロード・実機は未検証。
-証明書用秘密鍵の生成・GitHub Secrets登録は自動承認レビューが明示承認不足として拒否。未生成・未登録。
+2026-09-28更新: 利用者の明示承認後、証明書用秘密鍵を生成しGitHub Secretsへ保存済み。
+App Store ConnectのAPI認証と親Bundle ID取得は成功。
+[最初の署名ジョブ](https://github.com/dieu-detruit/brain-dump/actions/runs/36370580857)は
+Appleの配布証明書作成APIが403（権限不足）を返して停止。Team KeyのAdmin権限を利用者へ確認中。
+署名済みIPA・TestFlightアップロードは未完了。
+APNs設定はSupabaseに保存済み。WATCH_CRON_SECRETをEdge/Vaultへ設定し、認証付き通知エンドポイントが200（outcomes空）を返すことを確認。
+`enable-watch-cron.sql`を適用。端末未登録なのでAPNsへの実配送は未確認。

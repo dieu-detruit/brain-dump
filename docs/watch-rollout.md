@@ -20,8 +20,12 @@ Vercelで本番環境の更新版をビルドし、3本のmigration適用後に�
 実ゲートウェイ経由で、未認証のstate・devices取得と通知送信が401、不正な紐づけ要求が400になることを確認。
 実ゲートウェイ→DB経由のコード発行、正しい秘密値でのpending照会、誤った秘密値・未承認端末の401拒否を確認。
 検証用の未承認コードを1件作成（コードは5分で期限切れ）。実ユーザーへの紐づけやThread操作は行っていない。
-Googleログインしたユーザーによる接続承認と実機操作は未検証。鍵・Cron未設定で通知は未開始。
-署名済みIPA作成、TestFlightアップロードは未実行。
+Googleログインしたユーザーによる接続承認と実機操作は未検証。
+APNsキーと通知用Edge/Vault秘密値を設定済み。認証付き通知エンドポイントが200（outcomes空）を返した。
+`enable-watch-cron.sql`を適用済み。端末未登録で実機通知は未検証。
+証明書秘密鍵を利用者の明示承認後GitHub Secretsへ保存済み。
+[署名ビルド](https://github.com/dieu-detruit/brain-dump/actions/runs/36370580857)はApple認証・親App ID取得に成功したが、配布証明書作成が403で拒否。
+Team KeyのAdmin権限を確認待ち。署名済みIPA作成、TestFlightアップロードは未完了。
 
 ### 本番Webの切り替え記録
 
