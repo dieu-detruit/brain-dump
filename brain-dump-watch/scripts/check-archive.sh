@@ -23,4 +23,5 @@ for app in (container, container / 'Watch/BrainDumpWatch.app'):
         metadata = plistlib.load(file)
     assert metadata['CFBundleVersion'] == '123.4', 'Build number must follow CURRENT_PROJECT_VERSION'
     assert metadata['CFBundleShortVersionString'] == '1.0'
+    assert metadata.get('ITSAppUsesNonExemptEncryption') is False, 'Both bundles must declare exempt-only encryption'
 PY

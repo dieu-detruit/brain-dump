@@ -21,6 +21,8 @@ targets:
         CFBundleDisplayName: Brain Dump
         WKApplication: true
         WKWatchOnly: true
+        # HTTPS, Keychain, randomness and hashing use Apple's OS APIs only.
+        ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WatchAPIURL: $(BRAIN_DUMP_WATCH_API_URL)
@@ -54,6 +56,7 @@ targets:
       properties:
         CFBundleDisplayName: Brain Dump
         ITSWatchOnlyContainer: true
+        ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationLaunchProhibited: true
