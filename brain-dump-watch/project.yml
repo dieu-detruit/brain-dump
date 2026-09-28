@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: '5.0'
     DEVELOPMENT_TEAM: $(APPLE_TEAM_ID)
     WATCH_API_URL: $(BRAIN_DUMP_WATCH_API_URL)
-    MARKETING_VERSION: '0.1.0'
+    MARKETING_VERSION: '1.0'
     CURRENT_PROJECT_VERSION: 1
 targets:
   BrainDumpWatch:
@@ -21,6 +21,8 @@ targets:
         CFBundleDisplayName: Brain Dump
         WKApplication: true
         WKWatchOnly: true
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WatchAPIURL: $(BRAIN_DUMP_WATCH_API_URL)
         APNSEnvironment: $(APNS_ENVIRONMENT)
     settings:
@@ -52,6 +54,8 @@ targets:
       properties:
         CFBundleDisplayName: Brain Dump
         ITSWatchOnlyContainer: true
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationLaunchProhibited: true
         CFBundlePackageType: APPL
     settings:
