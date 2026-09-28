@@ -11,6 +11,14 @@ assert public.watch_manage('status',jsonb_build_object('pairing_id',id,'secret_h
 id:=r->>'device_id';
 r:=public.watch_manage('revoke',jsonb_build_object('device_id',id),'22222222-2222-4222-8222-222222222222'); assert r->>'error'='unauthorized';
 r:=public.watch_device_request(repeat('b',64),'state','{}'); assert r ? 'threads';
+r:=public.watch_device_request(repeat('b',64),'push-token',jsonb_build_object('token',repeat('ab',32),'environment','production')); assert r->>'status'='registered';
+assert (select push_token=repeat('ab',32) and push_environment='production' from watch_private.devices where token_hash=repeat('b',64));
+r:=public.watch_device_request(repeat('b',64),'push-token',jsonb_build_object('token',repeat('cd',256),'environment','sandbox')); assert r->>'status'='registered';
+for p in select value from jsonb_array_elements('[{"token":"abc","environment":"production"},{"token":"gg","environment":"production"},{"token":null,"environment":"production"},{"environment":"production"},{"token":"ab","environment":null},{"token":"ab","environment":"bad"},{"token":12,"environment":"production"}]'::jsonb) loop
+ r:=public.watch_device_request(repeat('b',64),'push-token',p); assert r->>'error'='invalid_request';
+end loop;
+r:=public.watch_device_request(repeat('b',64),'push-token',jsonb_build_object('token',repeat('ab',257),'environment','production')); assert r->>'error'='invalid_request';
+assert (select push_token=repeat('cd',256) and push_environment='sandbox' from watch_private.devices where token_hash=repeat('b',64));
 r:=public.watch_manage('revoke',jsonb_build_object('device_id',id),'11111111-1111-4111-8111-111111111111'); assert r->>'status'='revoked';
 r:=public.watch_device_request(repeat('b',64),'state','{}'); assert r->>'error'='unauthorized';
 end $$;
