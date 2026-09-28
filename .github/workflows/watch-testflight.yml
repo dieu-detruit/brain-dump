@@ -40,6 +40,8 @@ jobs:
           done
           keychain initialize
           app-store-connect fetch-signing-files "$APP_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE --create
+          watch_id=$(app-store-connect bundle-ids list --bundle-id-identifier "$APP_BUNDLE_ID.watchkitapp" --strict-match-identifier --json | python3 -c 'import json,sys; ids=json.load(sys.stdin); assert len(ids)==1, "Register the Watch Bundle ID first"; print(ids[0]["id"])')
+          app-store-connect bundle-ids enable-capabilities "$watch_id" --capability 'Push Notifications'
           app-store-connect fetch-signing-files "$APP_BUNDLE_ID.watchkitapp" --strict-match-identifier --type IOS_APP_STORE --create
           keychain add-certificates
       - name: Archive and export signed Watch app
