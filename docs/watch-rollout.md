@@ -11,8 +11,8 @@ Watchへ個人のログイン情報・管理者キーを埋め込まない。API
 全6 SQLスイートと競合テストを再実行済み。ホストされたAuthゲートウェイ経由の検証は配置後に行う。
 
 Apple Team IDは `XLVLA9AY6A`。GitHubの同名変数に保存済み。実機はApple Watch SE 3 / watchOS 26.5。
-親App ID `com.takafumi.brain-dump` は利用者が作成済み。Watch子ID・配布署名・App Store Connect連携・APNs鍵は未確認。
-GitHub署名ビルドと[利用者向け設定手順](watch-testflight-setup.md)を追加。Appleキー設定後に専用タグで起動する。
+親App ID `com.takafumi.brain-dump` とWatch子ID `com.takafumi.brain-dump.watchkitapp`、配布署名、App Store Connect連携を設定済み。
+GitHub署名ビルドと[利用者向け設定手順](watch-testflight-setup.md)を追加。専用タグで起動する。
 Supabase CLIログインを確認し、既存プロジェクト `zxiezbwnmqxccfvzarnj` へ接続済み。
 DBのdry runで未適用は20260924の3本のみと確認し、変更前publicスキーマを権限制限したローカル一時ディレクトリへ退避した。
 Vercelで本番環境の更新版をビルドし、3本のmigration適用後に本番URLを更新版へ切り替えた。
@@ -24,8 +24,11 @@ Googleログインしたユーザーによる接続承認と実機操作は未�
 APNsキーと通知用Edge/Vault秘密値を設定済み。認証付き通知エンドポイントが200（outcomes空）を返した。
 `enable-watch-cron.sql`を適用済み。端末未登録で実機通知は未検証。
 証明書秘密鍵を利用者の明示承認後GitHub Secretsへ保存済み。
-[署名ビルド](https://github.com/dieu-detruit/brain-dump/actions/runs/36370580857)はApple認証・親App ID取得に成功したが、配布証明書作成が403で拒否。
-Team KeyのAdmin権限を確認待ち。署名済みIPA作成、TestFlightアップロードは未完了。
+Adminチームキーへの更新後、配布証明書・プロファイルの作成に成功。
+Watch子IDへのPush Notifications有効化をworkflowに追加し、配布コンテナのCFBundlePackageTypeをAPPLに修正。
+[署名・export・Appleへのアップロード](https://github.com/dieu-detruit/brain-dump/actions/runs/36371400329)に成功（1.0 / build 1）。
+両Info.plistでビルド設定のバージョンを参照するよう修正し、[最終版1.0 / build 4.1](https://github.com/dieu-detruit/brain-dump/actions/runs/36371618891)のアップロードも成功。
+Apple側の処理完了・内部テスターへの追加・実機導入は未確認。
 
 ### 本番Webの切り替え記録
 
@@ -43,8 +46,8 @@ Team KeyのAdmin権限を確認待ち。署名済みIPA作成、TestFlightアッ
 - ローカルWebのテスト・lint・build: 実行可能。最新結果は実装報告を参照。
 - DenoのAPI・APNs署名/応答テスト: 実行可能。
 - PostgreSQL 17で既存migrationからの追加と操作・認証・通知テスト: 実行可能。
-- Supabase Edge Functions: 配置済み。未認証拒否を確認。認証済み操作・Vault・Cronは未検証。
-- Swift/Xcodeのコンパイル・XCTest（8件）・未署名watch-only archive: GitHub Actionsで成功。署名付きexportは未実行。
+- Supabase Edge Functions: 配置済み。未認証拒否・通知エンドポイントの認証付き200を確認。Vault設定とCron初回成功を確認。
+- Swift/Xcodeのコンパイル・XCTest・未署名watch-only archive: GitHub Actionsで成功。配布署名付きexportとAppleへのアップロードも成功。
 - TestFlight導入・実機通知・バックグラウンド回答: 未実行。
 
 ## ローカル検証

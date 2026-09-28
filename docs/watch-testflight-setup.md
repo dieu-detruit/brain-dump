@@ -108,9 +108,10 @@ Appleの処理が完了したら内部テストへ追加する。
 - [Codemagic CLIを他環境で使用](https://docs.codemagic.io/knowledge-codemagic/codemagic-cli-tools/)
 
 2026-09-28更新: 利用者の明示承認後、証明書用秘密鍵を生成しGitHub Secretsへ保存済み。
-App Store ConnectのAPI認証と親Bundle ID取得は成功。
-[最初の署名ジョブ](https://github.com/dieu-detruit/brain-dump/actions/runs/36370580857)は
-Appleの配布証明書作成APIが403（権限不足）を返して停止。Team KeyのAdmin権限を利用者へ確認中。
-署名済みIPA・TestFlightアップロードは未完了。
+Adminチームキーへの更新で配布証明書・プロファイル作成が成功。
+Watch子IDのPush Notifications有効化を自動化し、配布コンテナのアプリ種別を修正。
+[署名済みIPAの作成とアップロード](https://github.com/dieu-detruit/brain-dump/actions/runs/36371400329)が成功（1.0 / build 1）。
+ビルド番号の自動採番を両アプリに反映し、[最終版1.0 / build 4.1](https://github.com/dieu-detruit/brain-dump/actions/runs/36371618891)もアップロード済み。内部テストではこちらを選ぶ。
+Apple側の処理完了と内部テスターへの追加、実機導入は未確認。
 APNs設定はSupabaseに保存済み。WATCH_CRON_SECRETをEdge/Vaultへ設定し、認証付き通知エンドポイントが200（outcomes空）を返すことを確認。
 `enable-watch-cron.sql`を適用。端末未登録なのでAPNsへの実配送は未確認。
