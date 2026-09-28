@@ -9,7 +9,7 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 { cat tests/bootstrap.sql; cat migrations/*.sql; } | docker exec -i "$WATCH_TEST_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 >/dev/null
-for test in tests/execution.sql tests/devices.sql tests/notifications.sql tests/pairing_recovery.sql tests/legacy_confirmation.sql; do
+for test in tests/execution.sql tests/devices.sql tests/device_isolation.sql tests/notifications.sql tests/pairing_recovery.sql tests/legacy_confirmation.sql; do
   docker exec -i "$WATCH_TEST_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < "$test"
 done
 

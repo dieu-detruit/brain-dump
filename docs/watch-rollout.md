@@ -1,5 +1,20 @@
 # Watch版の検証・導入
 
+## 現在の引き継ぎ（2026-09-28）
+
+Apple Developer Program加入完了。認証は初回8桁コードで既存Webアカウントへ紐づける方式を採用する。
+Watchへ個人のログイン情報・管理者キーを埋め込まない。API/DBは既存Supabaseを共有する。
+
+端末トークン経由の複数ユーザー分離テストを追加し、一時PostgreSQLで成功:
+本人のThreadだけ取得でき、他ユーザーのThreadへの切り替え・セッション確認が拒否される。
+接続済みコードの他ユーザーによる再承認も拒否され、本人の操作で他ユーザーの実行状態が変わらない。
+全6 SQLスイートと競合テストを再実行済み。ホストされたAuthゲートウェイ経由の検証は配置後に行う。
+
+未設定: Apple Team ID・App ID・配布署名・App Store Connect連携・APNs鍵。
+Supabaseのプロジェクト参照はローカルにあるが、管理用のログイン情報は未確認。
+GitHub ActionsのリポジトリSecrets/Variablesも未設定。
+実環境へのmigration・関数配置、署名済みIPA作成、TestFlightアップロードは未実行。
+
 ## 実行済みと未実行
 
 - ローカルWebのテスト・lint・build: 実行可能。最新結果は実装報告を参照。
