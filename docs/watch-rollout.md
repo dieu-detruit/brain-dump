@@ -10,17 +10,21 @@ Watchへ個人のログイン情報・管理者キーを埋め込まない。API
 接続済みコードの他ユーザーによる再承認も拒否され、本人の操作で他ユーザーの実行状態が変わらない。
 全6 SQLスイートと競合テストを再実行済み。ホストされたAuthゲートウェイ経由の検証は配置後に行う。
 
-未設定: Apple Team ID・App ID・配布署名・App Store Connect連携・APNs鍵。
-Supabaseのプロジェクト参照はローカルにあるが、管理用のログイン情報は未確認。
-GitHub ActionsのリポジトリSecrets/Variablesも未設定。
-実環境へのmigration・関数配置、署名済みIPA作成、TestFlightアップロードは未実行。
+Apple Team IDは `XLVLA9AY6A`。GitHubの同名変数に保存済み。実機はApple Watch SE 3 / watchOS 26.5。
+App ID・配布署名・App Store Connect連携・APNs鍵は未設定。
+Supabase CLIログインを確認し、既存プロジェクト `zxiezbwnmqxccfvzarnj` へ接続済み。
+DBのdry runで未適用は20260924の3本のみと確認。旧確認RPCを置き換えるため、Web配置先を確認して更新を揃えるまでDB反映を保留する。
+`watch-api` / `watch-notifications` は既存プロジェクトへ配置済み（いずれもversion 1 / ACTIVE）。
+実ゲートウェイ経由で、未認証のstate・devices取得と通知送信が401、不正な紐づけ要求が400になることを確認。
+DB未反映のため、正しいコードによる接続・操作の実環境試験は未実行。鍵・Cron未設定で通知は未開始。
+署名済みIPA作成、TestFlightアップロードは未実行。
 
 ## 実行済みと未実行
 
 - ローカルWebのテスト・lint・build: 実行可能。最新結果は実装報告を参照。
 - DenoのAPI・APNs署名/応答テスト: 実行可能。
 - PostgreSQL 17で既存migrationからの追加と操作・認証・通知テスト: 実行可能。
-- Supabaseの実際のAuthゲートウェイ・Vault・Cron・Edge runtime: 未デプロイ。
+- Supabase Edge Functions: 配置済み。未認証拒否を確認。認証済み操作・Vault・Cronは未検証。
 - Swift/Xcodeのコンパイル・XCTest（8件）・未署名watch-only archive: GitHub Actionsで成功。署名付きexportは未実行。
 - TestFlight導入・実機通知・バックグラウンド回答: 未実行。
 
