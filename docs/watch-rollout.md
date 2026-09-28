@@ -1,5 +1,18 @@
 # Watch版の検証・導入
 
+## 暗号化申告と自動配信（2026-09-28）
+
+Watch本体と配布コンテナのInfo.plistに`ITSAppUsesNonExemptEncryption=false`を追加。
+対象はOS標準のURLSession HTTPS、Keychain、SecRandomCopyBytes、CryptoKit SHA-256のみを使う現行アプリ。
+暗号化実装・外部依存を変更する際は申告を再評価する。
+生成された両アプリのplistにboolean falseが入ることをarchive検査へ追加。
+署名workflowでアップロード後にAppleの処理状態・暗号化申告・内部テスト状態を読み戻す。
+[ビルド1.0（6.1）](https://github.com/dieu-detruit/brain-dump/actions/runs/36374849990)は手動回答なしで
+`VALID / usesNonExemptEncryption=false / IN_BETA_TESTING`を確認。
+既存`Internal`グループは`hasAccessToAllBuilds=true`（自動配信有効）。
+[ネイティブテストとarchive検査](https://github.com/dieu-detruit/brain-dump/actions/runs/36374847293)も成功。
+古いアップロード済みビルドの申告情報は、この変更では書き換えない。
+
 ## 実機導入後の修正・追加（2026-09-28）
 
 利用者がTestFlightから実機で起動・Web接続できたことを確認。

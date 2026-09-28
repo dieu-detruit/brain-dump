@@ -91,7 +91,11 @@ Appleの処理が完了したら内部テストへ追加する。
 
 1. App Store Connect → 対象アプリ → TestFlight → 内部テストで`Internal`グループを作成。
 2. 自分のApp Store Connectアカウントをテスターとして追加し、処理済みビルドを追加。
-   輸出コンプライアンスが求められたら、実装で使う暗号（OSのHTTPS・Keychain）に沿って回答する。
+   暗号化申告設定追加後のビルドは、両Info.plistに`ITSAppUsesNonExemptEncryption=false`を含む。
+   現在のアプリはOSのHTTPS・Keychain・乱数生成・SHA-256のみを使用するため、ビルドごとの質問への回答は不要。
+   設定追加前の古いビルドは自動更新されない。暗号化実装や依存ライブラリを変更する際は申告を再評価する。
+   内部グループの「自動配信を有効にする」を有効にすると、以降のビルドの手動追加も省ける。
+   2026-09-28: 既存Internalグループの自動配信有効をAPIで確認済み。1.0（6.1）は手動回答なしでテスト中になった。
 3. WatchとペアリングしているiPhoneへTestFlightをインストール。
 4. 招待をiPhoneで開いて承諾し、TestFlightのBrain Dumpで「インストール」。
    Watch専用アプリなのでWatchへインストールされる。
@@ -106,6 +110,7 @@ Appleの処理が完了したら内部テストへ追加する。
 - [Apple: APNsキー](https://developer.apple.com/help/account/keys/create-a-private-key)
 - [Apple: TestFlightインストール（watchOSの節）](https://testflight.apple.com/)
 - [Codemagic CLIを他環境で使用](https://docs.codemagic.io/knowledge-codemagic/codemagic-cli-tools/)
+- [Apple: ITSAppUsesNonExemptEncryption](https://developer.apple.com/documentation/BundleResources/Information-Property-List/ITSAppUsesNonExemptEncryption)
 
 2026-09-28更新: 利用者の明示承認後、証明書用秘密鍵を生成しGitHub Secretsへ保存済み。
 Adminチームキーへの更新で配布証明書・プロファイル作成が成功。
