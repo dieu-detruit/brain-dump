@@ -1,0 +1,64 @@
+name: Watch Climber TestFlight
+on:
+  workflow_dispatch:
+  push:
+    tags: ['watch-climber-testflight-*']
+permissions:
+  contents: read
+concurrency:
+  group: watch-climber-testflight
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+      APP_BUNDLE_ID: dev.takafumi.watchclimber
+      WATCH_BUNDLE_ID: dev.takafumi.watchclimber.watchkit
+    steps:
+      # Existing Secrets stay here. Build only this reviewed immutable source.
+      - uses: actions/checkout@v4
+        with:
+          repository: dieu-detruit/watch-climber
+          ref: 6e5479aee7ed01f3b259563f165ee9c832af4a1b
+          persist-credentials: false
+      - name: Prepare build tools
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.3.app
+          brew install xcodegen
+          python3 -m venv "$RUNNER_TEMP/signing-tools"
+          "$RUNNER_TEMP/signing-tools/bin/pip" install codemagic-cli-tools==0.69.0
+          echo "$RUNNER_TEMP/signing-tools/bin" >> "$GITHUB_PATH"
+      - name: Confirm app and fetch signing files
+        env:
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY CERTIFICATE_PRIVATE_KEY; do
+            test -n "${!name}" || { echo "Missing secret: $name"; exit 1; }
+          done
+          python watch-climber-watch/scripts/verify-testflight.py --check-app-only
+          keychain initialize
+          app-store-connect fetch-signing-files "$APP_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE --create
+          watch_id=$(app-store-connect bundle-ids list --bundle-id-identifier "$WATCH_BUNDLE_ID" --strict-match-identifier --json | python3 -c 'import json,sys; ids=json.load(sys.stdin); assert len(ids)==1, "Register the Watch Bundle ID first"; print(ids[0]["id"])')
+          app-store-connect bundle-ids enable-capabilities "$watch_id" --capability HealthKit
+          app-store-connect fetch-signing-files "$WATCH_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE --create
+          keychain add-certificates
+      - name: Archive and export Watch Climber
+        run: |
+          export BUILD_NUMBER="$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
+          bash watch-climber-watch/scripts/archive.sh
+      - name: Upload to TestFlight and verify processing
+        env:
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: |
+          app-store-connect publish --path '/tmp/watch-climber-export/*.ipa'
+          python watch-climber-watch/scripts/verify-testflight.py
+      # No external beta review or public App Store submission; no signing artifacts.
