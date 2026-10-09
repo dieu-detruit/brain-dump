@@ -1,8 +1,8 @@
 name: Watch Climber TestFlight
 on:
-  workflow_dispatch:
   push:
-    tags: ['watch-climber-testflight-*']
+    branches: ['ci/watch-climber-goryu-20261010']
+    paths: ['.github/workflows/watch-climber-testflight.yml']
 permissions:
   contents: read
 concurrency:
@@ -10,6 +10,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upload:
+    # Only the first planned fast-forward update of this temporary branch may publish.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ci/watch-climber-goryu-20261010' && github.event.before == '80d8f122842a5c4551ac5062cf4b61e9477cf766' && !github.event.created && !github.event.deleted && !github.event.forced }}
     runs-on: macos-26
     timeout-minutes: 45
     env:
@@ -21,8 +23,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: dieu-detruit/watch-climber
-          ref: 864105f63d1035df65f29c6f13af9097de89c786
+          ref: 678fc3959a6b5886b8d5d0785f920936861d3dfe
           persist-credentials: false
+      - name: Verify release build number
+        run: |
+          test "$GITHUB_RUN_NUMBER" -ge 3
+          echo "Release build: $GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT"
       - name: Prepare build tools
         run: |
           sudo xcode-select --switch /Applications/Xcode_26.3.app
@@ -30,7 +36,17 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/signing-tools"
           "$RUNNER_TEMP/signing-tools/bin/pip" install codemagic-cli-tools==0.69.0
           echo "$RUNNER_TEMP/signing-tools/bin" >> "$GITHUB_PATH"
-      - name: Confirm app and fetch signing files
+      - name: Build and test Watch app before signing
+        run: bash watch-climber-watch/scripts/test.sh
+      - name: Save test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: watch-climber-tests
+          path: /tmp/climber-tests-local.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Confirm app and fetch existing signing files
         env:
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
@@ -43,10 +59,8 @@ jobs:
           done
           python watch-climber-watch/scripts/verify-testflight.py --check-app-only
           keychain initialize
-          app-store-connect fetch-signing-files "$APP_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE --create
-          watch_id=$(app-store-connect bundle-ids list --bundle-id-identifier "$WATCH_BUNDLE_ID" --strict-match-identifier --json | python3 -c 'import json,sys; ids=json.load(sys.stdin); assert len(ids)==1, "Register the Watch Bundle ID first"; print(ids[0]["id"])')
-          app-store-connect bundle-ids enable-capabilities "$watch_id" --capability HealthKit
-          app-store-connect fetch-signing-files "$WATCH_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE --create
+          app-store-connect fetch-signing-files "$APP_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE
+          app-store-connect fetch-signing-files "$WATCH_BUNDLE_ID" --strict-match-identifier --type IOS_APP_STORE
           keychain add-certificates
       - name: Archive and export Watch Climber
         run: |
