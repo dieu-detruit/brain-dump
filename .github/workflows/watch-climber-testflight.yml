@@ -1,8 +1,6 @@
 name: Watch Climber TestFlight
 on:
-  push:
-    branches: ['ci/watch-climber-goryu-20261010']
-    paths: ['.github/workflows/watch-climber-testflight.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -10,8 +8,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upload:
-    # Only the first planned fast-forward update of this temporary branch may publish.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ci/watch-climber-goryu-20261010' && github.event.before == '80d8f122842a5c4551ac5062cf4b61e9477cf766' && !github.event.created && !github.event.deleted && !github.event.forced }}
+    # One-time release completed or handed off; no further publication from this branch.
+    if: ${{ false }}
     runs-on: macos-26
     timeout-minutes: 45
     env:
