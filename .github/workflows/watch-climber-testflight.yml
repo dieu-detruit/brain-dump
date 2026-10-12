@@ -1,8 +1,6 @@
 name: Watch Climber TestFlight
 on:
-  push:
-    branches: ['ci/watch-climber-record-export-20261012']
-    paths: ['.github/workflows/watch-climber-testflight.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -10,8 +8,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   upload:
-    # Only the first planned fast-forward update of this temporary branch may publish.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ci/watch-climber-record-export-20261012' && github.event.before == 'fc75cae6952bdb6d505f3291a278f662494da655' && github.run_attempt == 1 && !github.event.created && !github.event.deleted && !github.event.forced }}
+    # This one-shot release has been launched; block further publication from this branch.
+    if: ${{ false }}
     runs-on: macos-26
     timeout-minutes: 45
     env:
