@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
     tags: ['watch-climber-testflight-*']
+    branches: ['ci/watch-climber-testflight']
+    paths:
+      - '.github/workflows/watch-climber-testflight.yml'
 permissions:
   contents: read
 concurrency:
@@ -21,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: dieu-detruit/watch-climber
-          ref: 864105f63d1035df65f29c6f13af9097de89c786
+          ref: 800716fd3100737f6fdcf13d5bf1d4aa06065b9f
           persist-credentials: false
       - name: Prepare build tools
         run: |
