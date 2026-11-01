@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: dieu-detruit/watch-climber
-          ref: 4cfa688a34b2c5c2bf10ac198a39b856d61d5a32
+          ref: 4bde380108ecc294ba2deb62621bb010866a2b23
           persist-credentials: false
       - name: Prepare build tools
         run: |
