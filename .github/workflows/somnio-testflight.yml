@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: dieu-detruit/somni
-          ref: 2d7c00311f61dbf19915cb060fcc29d0b611b46b
+          ref: 4e93319401862efc440a3a2c753bbe9d550464fa
           persist-credentials: false
       - name: Prepare build tools
         run: |
